@@ -164,4 +164,4 @@ MIT
 
 ## 👤 Autor
 
-Desenvolvido por Valter com assistência da Manus AI
+Desenvolvido por Valter Russo
