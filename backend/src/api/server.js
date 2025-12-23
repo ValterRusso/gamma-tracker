@@ -166,7 +166,7 @@ class APIServer {
     // Wall Zones (zonas de suporte/resistência)
     this.app.get('/api/wall-zones', (req, res) => {
       try {
-        const options = this.dataCollector.getOptions();
+        const options = this.dataCollector.getOptionsByStrike();
         const spotPrice = this.dataCollector.getSpotPrice();
         
         if (options.length === 0) {
