@@ -1,11 +1,28 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Activity, TrendingUp, TrendingDown, Target, Shield, AlertTriangle } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, ReferenceArea } from "recharts";
 import axios from "axios";
 
 // Backend API URL
 const API_BASE_URL = "http://localhost:3300/api";
+
+interface WallZone {
+  peak: number;
+  peakGEX: number;
+  zoneLow: number;
+  zoneHigh: number;
+  zoneWidth: number;
+  strikeCount: number;
+  totalZoneGEX: number;
+  threshold: number;
+  zoneStrikes: Array<{ strike: number; gex: number; percentage: number }>;
+  distanceFromSpot: { peak: number; zoneLow: number; zoneHigh: number };
+  distancePercent: { peak: number; zoneLow: number; zoneHigh: number };
+
+  
+}
+
 
 interface Metrics {
   totalGEX: { total: number; calls: number; puts: number; netGamma: string };
@@ -14,6 +31,11 @@ interface Metrics {
     putWall: { strike: number; gex: number; distancePercent: number };
     callWall: { strike: number; gex: number; distancePercent: number };
   };
+  wallZones: {
+    spotPrice: number;
+    putWallZone: WallZone | null;
+    callWallZone: WallZone | null;
+  }
   insights: {
     regime: {
       regime: string;
@@ -40,10 +62,11 @@ export default function Home() {
 
   const fetchMetrics = async () => {
     try {
-      const [totalGEX, gammaFlip, walls, insights, gammaProfile] = await Promise.all([
+      const [totalGEX, gammaFlip, walls, wallZones, insights, gammaProfile] = await Promise.all([
         axios.get(`${API_BASE_URL}/total-gex`),
         axios.get(`${API_BASE_URL}/gamma-flip`),
         axios.get(`${API_BASE_URL}/walls`),
+        axios.get(`${API_BASE_URL}/wall-zones`),
         axios.get(`${API_BASE_URL}/insights`),
         axios.get(`${API_BASE_URL}/gamma-profile`),
       ]);
@@ -52,6 +75,7 @@ export default function Home() {
         totalGEX: totalGEX.data.data,
         gammaFlip: gammaFlip.data.data,
         walls: walls.data.data,
+        wallZones: wallZones.data.data,
         insights: insights.data.data,
         gammaProfile: gammaProfile.data.data,
       });
@@ -283,7 +307,7 @@ export default function Home() {
                   dataKey="strike"
                   type="number"
                   scale="linear"
-                  domain={["dataMin", "dataMax"]}
+                  domain={["$50.000", "$100.000"]}
                   stroke="oklch(0.65 0.015 286.067)"
                   tick={{ fill: "oklch(0.65 0.015 286.067)", fontSize: 12 }}
                   angle={-45}
@@ -323,6 +347,45 @@ export default function Home() {
                     fontWeight: "bold",
                   }}
                 />
+                {/* Put Wall Zone (support) */}
+                {metrics.wallZones.putWallZone && (
+                  <ReferenceArea
+                    x1={metrics.wallZones.putWallZone.zoneLow}
+                    x2={metrics.wallZones.putWallZone.zoneHigh}
+                    fill="oklch(0.7 0.2 10)"
+                    fillOpacity={0.2}
+                    stroke="oklch(0.7 0.2 10)"
+                    strokeWidth={2}
+                    strokeOpacity={0.5}
+                    label={{
+                      value: `Put Zone`,
+                      position: "insideBottom",
+                      fill: "oklch(0.7 0.2 10)",
+                      fontSize: 11,
+                      angle: -45
+                    }}
+                  />
+                )}
+                {/* Call Wall Zone (resistence) */}
+                {metrics.wallZones.callWallZone && (
+                  <ReferenceArea
+                  x1={metrics.wallZones.callWallZone.zoneLow}
+                  x2={metrics.wallZones.callWallZone.zoneHigh}
+                  fill="green"
+                  fillOpacity={0.2}
+                  stroke="green"
+                  strokeWidth={2}
+                  strokeOpacity={0.5}
+                  label={{
+                    value: `Call Zone`,
+                    position: "insideBottom",
+                    fill: "green",
+                    fontSize: 11,
+                    angle: -45
+                  }}
+                  />
+                )}               
+                
                 <Bar dataKey="totalGEX" radius={[4, 4, 0, 0]}>
                   {metrics.gammaProfile.map((entry, index) => (
                     <Cell
