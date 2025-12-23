@@ -167,14 +167,14 @@ class APIServer {
       try {
         const metrics = await this.getMetrics();       
         
-        if (!metrics.options || metrics.options.length === 0) {
+        if (!metrics || metrics.gammaProfile || metrics.gammaProfile.length === 0) {
           return res.json({
             success: false,
             error: 'Nenhuma option disponível'
           });
         }        
 
-        const wallZones = this.gexCalculator.findWallZones(options);
+        const wallZones = this.calculateWallZonesFromProfile(metrics.gammaProfile);
         const spotPrice = metrics.spotPrice;
         
         // Adicionar distâncias do spot
@@ -351,6 +351,89 @@ class APIServer {
     
     return metrics;
   }
+
+  /**
+ * Calcula wall zones a partir do gamma profile
+ */
+calculateWallZonesFromProfile(gammaProfile, threshold = 0.7) {
+  if (!gammaProfile || gammaProfile.length === 0) {
+    return { putWallZone: null, callWallZone: null };
+  }
+
+  // Encontrar picos de Put e Call
+  const putPeak = gammaProfile.reduce((max, item) => 
+    item.putGEX < max.putGEX ? item : max
+  );
+  
+  const callPeak = gammaProfile.reduce((max, item) => 
+    item.callGEX > max.callGEX ? item : max
+  );
+
+  // Calcular zona de Put Wall
+  let putWallZone = null;
+  if (putPeak && putPeak.putGEX < 0) {
+    const putThreshold = Math.abs(putPeak.putGEX) * threshold;
+    const putZoneStrikes = gammaProfile
+      .filter(p => p.putGEX < 0 && Math.abs(p.putGEX) >= putThreshold)
+      .map(p => ({
+        strike: p.strike,
+        gex: p.putGEX,
+        percentage: (Math.abs(p.putGEX) / Math.abs(putPeak.putGEX)) * 100
+      }))
+      .sort((a, b) => a.strike - b.strike);
+
+    if (putZoneStrikes.length > 0) {
+      const zoneLow = putZoneStrikes[0].strike;
+      const zoneHigh = putZoneStrikes[putZoneStrikes.length - 1].strike;
+      
+      putWallZone = {
+        peak: putPeak.strike,
+        peakGEX: putPeak.putGEX,
+        zoneLow: zoneLow,
+        zoneHigh: zoneHigh,
+        zoneWidth: zoneHigh - zoneLow,
+        zoneStrikes: putZoneStrikes,
+        strikeCount: putZoneStrikes.length,
+        threshold: threshold,
+        totalZoneGEX: putZoneStrikes.reduce((sum, s) => sum + s.gex, 0)
+      };
+    }
+  }
+
+  // Calcular zona de Call Wall
+  let callWallZone = null;
+  if (callPeak && callPeak.callGEX > 0) {
+    const callThreshold = callPeak.callGEX * threshold;
+    const callZoneStrikes = gammaProfile
+      .filter(p => p.callGEX > 0 && p.callGEX >= callThreshold)
+      .map(p => ({
+        strike: p.strike,
+        gex: p.callGEX,
+        percentage: (p.callGEX / callPeak.callGEX) * 100
+      }))
+      .sort((a, b) => a.strike - b.strike);
+
+    if (callZoneStrikes.length > 0) {
+      const zoneLow = callZoneStrikes[0].strike;
+      const zoneHigh = callZoneStrikes[callZoneStrikes.length - 1].strike;
+      
+      callWallZone = {
+        peak: callPeak.strike,
+        peakGEX: callPeak.callGEX,
+        zoneLow: zoneLow,
+        zoneHigh: zoneHigh,
+        zoneWidth: zoneHigh - zoneLow,
+        zoneStrikes: callZoneStrikes,
+        strikeCount: callZoneStrikes.length,
+        threshold: threshold,
+        totalZoneGEX: callZoneStrikes.reduce((sum, s) => sum + s.gex, 0)
+      };
+    }
+  }
+
+  return { putWallZone, callWallZone };
+}
+
 
   /**
    * Estima o spot price baseado nas options ATM
