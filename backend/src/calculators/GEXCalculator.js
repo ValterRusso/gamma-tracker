@@ -347,13 +347,89 @@ findWallZones(options, threshold = 0.7) {
         totalZoneGEX: callZoneStrikes.reduce((sum, s) => sum + s.gex, 0)
       };
     }
-  }
+  } 
 
   return {
     putWallZone,
     callWallZone
   };
 }
+
+/**
+ * Calcula range inteligente de strikes para visualização
+ * Combina: Wall Zones + % do spot + threshold de GEX
+ * 
+ * @param {Array} gammaProfile - Profile completo de gamma
+ * @param {number} spotPrice - Preço spot atual
+ * @param {Object} wallZones - Zonas de Put/Call Wall
+ * @param {number} rangePercent - Percentual do spot (padrão: 0.3 = ±30%)
+ * @param {number} gexThreshold - Threshold mínimo de GEX (padrão: 0.02 = 2%)
+ * @returns {Object} - { minStrike, maxStrike, filteredProfile }
+ */
+calculateSmartRange(gammaProfile, spotPrice, wallZones, rangePercent = 0.3, gexThreshold = 0.02) {
+  if (!gammaProfile || gammaProfile.length === 0) {
+    return {
+      minStrike: spotPrice * (1 - rangePercent),
+      maxStrike: spotPrice * (1 + rangePercent),
+      filteredProfile: []
+    };
+  }
+
+  // 1. Calcular range baseado em Wall Zones
+  let zoneLow = spotPrice * (1 - rangePercent);
+  let zoneHigh = spotPrice * (1 + rangePercent);
+
+  if (wallZones.putWallZone && wallZones.callWallZone) {
+    // Expandir range para incluir as zonas com margem
+    const margin = spotPrice * 0.05; // 5% de margem
+    zoneLow = Math.min(zoneLow, wallZones.putWallZone.zoneLow - margin);
+    zoneHigh = Math.max(zoneHigh, wallZones.callWallZone.zoneHigh + margin);
+  }
+
+  // 2. Encontrar GEX máximo para calcular threshold
+  const maxAbsGEX = Math.max(
+    ...gammaProfile.map(p => Math.max(Math.abs(p.callGEX), Math.abs(p.putGEX)))
+  );
+  const minSignificantGEX = maxAbsGEX * gexThreshold;
+
+  // 3. Filtrar strikes
+  const filteredProfile = gammaProfile.filter(p => {
+    // Dentro do range de preço
+    const inPriceRange = p.strike >= zoneLow && p.strike <= zoneHigh;
+    
+    // GEX significativo OU dentro das wall zones
+    const hasSignificantGEX = 
+      Math.abs(p.callGEX) >= minSignificantGEX || 
+      Math.abs(p.putGEX) >= minSignificantGEX;
+    
+    const inWallZone = 
+      (wallZones.putWallZone && 
+       p.strike >= wallZones.putWallZone.zoneLow && 
+       p.strike <= wallZones.putWallZone.zoneHigh) ||
+      (wallZones.callWallZone && 
+       p.strike >= wallZones.callWallZone.zoneLow && 
+       p.strike <= wallZones.callWallZone.zoneHigh);
+
+    return inPriceRange && (hasSignificantGEX || inWallZone);
+  });
+
+  // 4. Ajustar range final baseado nos strikes filtrados
+  if (filteredProfile.length > 0) {
+    const strikes = filteredProfile.map(p => p.strike);
+    zoneLow = Math.min(...strikes);
+    zoneHigh = Math.max(...strikes);
+  }
+
+  return {
+    minStrike: zoneLow,
+    maxStrike: zoneHigh,
+    filteredProfile: filteredProfile,
+    totalStrikes: gammaProfile.length,
+    filteredStrikes: filteredProfile.length,
+    compressionRatio: ((1 - filteredProfile.length / gammaProfile.length) * 100).toFixed(1)
+  };
+}
+
 
 
   /**
