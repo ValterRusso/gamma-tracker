@@ -137,6 +137,7 @@ class GammaTracker {
     console.log(`   Total GEX: http://localhost:${this.config.apiPort}/api/total-gex`);
     console.log(`   Gamma Flip: http://localhost:${this.config.apiPort}/api/gamma-flip`);
     console.log(`   Walls: http://localhost:${this.config.apiPort}/api/walls`);
+    console.log(`   wall-zones: http://localhost:${this.config.apiPort}/api/wall-zones`);
     
     console.log('\n' + '='.repeat(70));
     console.log('Sistema rodando. Pressione Ctrl+C para sair.\n');
