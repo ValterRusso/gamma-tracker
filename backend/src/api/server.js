@@ -6,7 +6,6 @@ const express = require('express');
 const cors = require('cors');
 const Logger = require('../utils/logger');
 
-
 class APIServer {
   constructor(dataCollector, gexCalculator, regimeAnalyzer, config = {}) {
     this.dataCollector = dataCollector;
@@ -164,19 +163,19 @@ class APIServer {
     });
 
     // Wall Zones (zonas de suporte/resistência)
-    this.app.get('/api/wall-zones', (req, res) => {
+    this.app.get('/api/wall-zones', async(req, res) => {
       try {
-        const options = this.dataCollector.getOptionsByStrike();
-        const spotPrice = this.dataCollector.getSpotPrice();
+        const metrics = await this.getMetrics();       
         
-        if (options.length === 0) {
+        if (!metrics.options || metrics.options.length === 0) {
           return res.json({
             success: false,
             error: 'Nenhuma option disponível'
           });
-        }
+        }        
 
-        const wallZones = gexCalculator.findWallZones(options);
+        const wallZones = this.gexCalculator.findWallZones(options);
+        const spotPrice = metrics.spotPrice;
         
         // Adicionar distâncias do spot
         if (wallZones.putWallZone) {
@@ -213,7 +212,7 @@ class APIServer {
           }
         });
       } catch (error) {
-        console.error('[APIServer] Erro ao calcular wall zones', error);
+        this.logger.error('[APIServer] Erro ao calcular wall zones', error);
         res.status(500).json({
           success: false,
           error: error.message
