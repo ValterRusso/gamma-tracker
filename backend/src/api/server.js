@@ -92,21 +92,67 @@ class APIServer {
     });
 
     // Perfil de gamma
-    this.app.get('/api/gamma-profile', async (req, res) => {
-      try {
-        const metrics = await this.getMetrics();
-        res.json({
-          success: true,
-          data: metrics.gammaProfile
-        });
-      } catch (error) {
-        this.logger.error('Erro ao obter perfil de gamma', error);
-        res.status(500).json({
-          success: false,
-          error: error.message
-        });
-      }
+    // Gamma Profile (com filtro inteligente)
+this.app.get('/api/gamma-profile', async (req, res) => {
+  try {
+    const metrics = await this.getMetrics();
+    
+    if (!metrics || !metrics.gammaProfile || metrics.gammaProfile.length === 0) {
+      return res.json({
+        success: false,
+        error: 'Nenhum dado disponível'
+      });
+    }
+
+    // Parâmetros de filtro (query params)
+    const rangePercent = parseFloat(req.query.range) || 0.3; // padrão: ±30%
+    const gexThreshold = parseFloat(req.query.threshold) || 0.02; // padrão: 2%
+    const autoRange = req.query.auto !== 'false'; // padrão: true
+
+    let profile = metrics.gammaProfile;
+    let rangeInfo = null;
+
+    // Aplicar filtro inteligente se auto=true
+    if (autoRange) {
+      // Buscar wall zones para cálculo inteligente
+      const wallZones = this.calculateWallZonesFromProfile(metrics.gammaProfile);
+      
+      const smartRange = this.gexCalculator.calculateSmartRange(
+        metrics.gammaProfile,
+        metrics.spotPrice,
+        wallZones,
+        rangePercent,
+        gexThreshold
+      );
+
+      profile = smartRange.filteredProfile;
+      rangeInfo = {
+        minStrike: smartRange.minStrike,
+        maxStrike: smartRange.maxStrike,
+        totalStrikes: smartRange.totalStrikes,
+        filteredStrikes: smartRange.filteredStrikes,
+        compressionRatio: smartRange.compressionRatio,
+        rangePercent: rangePercent,
+        gexThreshold: gexThreshold
+      };
+    }
+
+    res.json({
+      success: true,
+      data: profile,
+      rangeInfo: rangeInfo,
+      spotPrice: metrics.spotPrice
     });
+  } catch (error) {
+    this.logger.error('Erro ao gerar gamma profile', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+   
 
     // GEX total
     this.app.get('/api/total-gex', async (req, res) => {
