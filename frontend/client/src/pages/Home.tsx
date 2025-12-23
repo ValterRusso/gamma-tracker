@@ -307,7 +307,7 @@ export default function Home() {
                   dataKey="strike"
                   type="number"
                   scale="linear"
-                  domain={["$50.000", "$100.000"]}
+                  domain={["dataMin", "dataMax"]}
                   stroke="oklch(0.65 0.015 286.067)"
                   tick={{ fill: "oklch(0.65 0.015 286.067)", fontSize: 12 }}
                   angle={-45}
@@ -381,7 +381,7 @@ export default function Home() {
                     position: "insideBottom",
                     fill: "green",
                     fontSize: 11,
-                    angle: -45
+                    angle:-45
                   }}
                   />
                 )}               
