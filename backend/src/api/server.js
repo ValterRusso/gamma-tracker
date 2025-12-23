@@ -167,7 +167,7 @@ class APIServer {
       try {
         const metrics = await this.getMetrics();       
         
-        if (!metrics || metrics.gammaProfile || metrics.gammaProfile.length === 0) {
+        if (!metrics || !metrics.gammaProfile || metrics.gammaProfile.length === 0) {
           return res.json({
             success: false,
             error: 'Nenhuma option disponível'
