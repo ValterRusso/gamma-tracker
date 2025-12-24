@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Activity, TrendingUp, TrendingDown, Target, Shield, AlertTriangle } from "lucide-react";
+import { Activity, TrendingUp, TrendingDown, Target, Shield, AlertTriangle, BarChart3, Mountain } from "lucide-react";
+import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, ReferenceArea } from "recharts";
 import axios from "axios";
 
@@ -146,9 +147,17 @@ export default function Home() {
                 Real-time Options Market Analysis
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Last Update</p>
-              <p className="text-sm font-mono">{lastUpdate.toLocaleTimeString()}</p>
+            <div className="flex items-center gap-4">
+              <Link href="/volatility-surface">
+                <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                  <Mountain className="w-4 h-4" />
+                  <span className="font-medium">Vol Surface</span>
+                </button>
+              </Link>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Last Update</p>
+                <p className="text-sm font-mono">{lastUpdate.toLocaleTimeString()}</p>
+              </div>
             </div>
           </div>
         </div>
