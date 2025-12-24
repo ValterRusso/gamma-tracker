@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Plot from 'react-plotly.js';
 import { Link } from 'wouter';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, BarChart3 } from 'lucide-react';
 
 interface VolSurfaceData {
   strikes: number[];
@@ -204,6 +204,12 @@ export default function VolatilitySurface() {
             <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors">
               <ArrowLeft className="w-4 h-4" />
               <span className="font-medium">Back to Gamma</span>
+            </button>
+          </Link>
+          <Link href="/volatility-skew">
+            <button className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors">
+              <BarChart3 className="w-4 h-4" />
+              <span className="font-medium">2D Skew Viewer</span>
             </button>
           </Link>
         </div>
