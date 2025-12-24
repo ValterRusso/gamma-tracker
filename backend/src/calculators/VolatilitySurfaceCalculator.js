@@ -69,6 +69,8 @@ class VolatilitySurfaceCalculator {
     // 3. Agrupar por DTE e Strike
     const surfaceMap = new Map();
     
+    this.logger.info(`Agrupando ${enrichedOptions.length} options por DTE e Strike`);
+    
     enrichedOptions.forEach(opt => {
       const key = `${opt.dte}_${opt.strike}`;
       
@@ -97,10 +99,23 @@ class VolatilitySurfaceCalculator {
           volume: opt.volume || 0,
           openInterest: opt.openInterest || 0
         });
+      } else {
+        this.logger.warn(`Option com type inválido: ${opt.symbol}, type: ${opt.type}`);
       }
     });
 
     // 4. Calcular IV médio por ponto (weighted by OI)
+    this.logger.info(`Surface map tem ${surfaceMap.size} pontos únicos (DTE x Strike)`);
+    
+    // DEBUG: Ver alguns pontos
+    let debugCount = 0;
+    surfaceMap.forEach((point, key) => {
+      if (debugCount < 3) {
+        this.logger.info(`Ponto ${key}: calls=${point.calls.length}, puts=${point.puts.length}`);
+        debugCount++;
+      }
+    });
+    
     const surfacePoints = Array.from(surfaceMap.values()).map(point => {
       const calcWeightedIV = (options) => {
         if (options.length === 0) return null;
