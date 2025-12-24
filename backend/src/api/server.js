@@ -5,12 +5,16 @@
 const express = require('express');
 const cors = require('cors');
 const Logger = require('../utils/logger');
+const VolatilitySurfaceCalculator = require('../calculators/VolatilitySurfaceCalculator');
+
 
 class APIServer {
   constructor(dataCollector, gexCalculator, regimeAnalyzer, config = {}) {
     this.dataCollector = dataCollector;
     this.gexCalculator = gexCalculator;
     this.regimeAnalyzer = regimeAnalyzer;
+    this.volSurfaceCalculator = new VolatilitySurfaceCalculator();
+
     
     this.config = {
       port: config.port || process.env.API_PORT || 3300,
@@ -266,6 +270,51 @@ this.app.get('/api/gamma-profile', async (req, res) => {
       }
     });
 
+    // Volatility Surface (superfície de volatilidade 3D)
+    this.app.get('/api/vol-surface', async (req, res) => {
+      try {
+        const metrics = await this.getMetrics();
+        
+        if (!metrics || !metrics.gammaProfile || metrics.gammaProfile.length === 0) {
+          return res.json({
+            success: false,
+            error: 'Nenhum dado disponível'
+          });
+        }
+
+        // Obter todas as options (não apenas o profile)
+        // Precisamos das options completas com IV, expiry, etc.
+        const allOptions = this.dataCollector.getAllOptions();
+        
+        if (!allOptions ||  allOptions.length === 0) {
+          return res.json({
+            success: false,
+            error: 'Nenhuma option disponível'
+          });
+        }
+
+        const spotPrice = metrics.spotPrice;
+        const surface = this.volSurfaceCalculator.buildSurface(allOptions, spotPrice);
+
+        if (!surface) {
+          return res.json({
+            success: false,
+            error: 'Não foi possível construir superfície de volatilidade'
+          });
+        }
+
+        res.json({
+          success: true,
+          data: surface
+        });
+      } catch (error) {
+        this.logger.error('Erro ao gerar vol surface', error);
+        res.status(500).json({
+          success: false,
+          error: error.message
+        });
+      }
+    });
 
     // Insights e análise de regime
     this.app.get('/api/insights', async (req, res) => {
