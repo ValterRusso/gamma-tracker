@@ -10,6 +10,7 @@ class Option {
     this.strike = parseFloat(data.strikePrice || this.parseStrike(data.symbol));
     this.expiryDate = data.expiryDate || this.parseExpiry(data.symbol);
     this.side = data.side || this.parseSide(data.symbol); // 'CALL' ou 'PUT'
+    this.type = this.side; // Alias para compatibilidade
     this.contractSize = parseFloat(data.unit || data.contractSize || 1);
     
     // Mark price e volatilidade
