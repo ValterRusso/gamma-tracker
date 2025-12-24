@@ -110,7 +110,7 @@ export default function VolatilitySkew() {
       .sort((a, b) => a.strike - b.strike)
       .map(p => ({
         strike: p.strike,
-        moneyness: p.moneyness,
+        moneyness: p.moneyness * 100, // Convert from decimal (0.95) to percentage (95)
         callIV: p.callIV ? p.callIV * 100 : null,
         putIV: p.putIV ? p.putIV * 100 : null,
         avgIV: p.avgIV ? p.avgIV * 100 : null,
@@ -130,6 +130,7 @@ export default function VolatilitySkew() {
       Math.abs(curr.moneyness - 100) < Math.abs(prev.moneyness - 100) ? curr : prev
     );
     
+    // Note: moneyness comes as decimal (0.95 = 95%), not percentage
     const otmPuts = skewData.filter(p => p.moneyness < 95 && p.putIV);
     const otmCalls = skewData.filter(p => p.moneyness > 105 && p.callIV);
     
@@ -385,3 +386,4 @@ export default function VolatilitySkew() {
     </div>
   );
 }
+
