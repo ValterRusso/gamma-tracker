@@ -18,9 +18,7 @@ interface WallZone {
   threshold: number;
   zoneStrikes: Array<{ strike: number; gex: number; percentage: number }>;
   distanceFromSpot: { peak: number; zoneLow: number; zoneHigh: number };
-  distancePercent: { peak: number; zoneLow: number; zoneHigh: number };
-
-  
+  distancePercent: { peak: number; zoneLow: number; zoneHigh: number };  
 }
 
 
@@ -59,6 +57,8 @@ export default function Home() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [rangePercent, setRangePercent] = useState(0.3); // +/- 30% padrao
+  const [autoRange, setAutoRange] = useState(true);
 
   const fetchMetrics = async () => {
     try {
@@ -68,8 +68,9 @@ export default function Home() {
         axios.get(`${API_BASE_URL}/walls`),
         axios.get(`${API_BASE_URL}/wall-zones`),
         axios.get(`${API_BASE_URL}/insights`),
-        axios.get(`${API_BASE_URL}/gamma-profile`),
-      ]);
+        axios.get(`${API_BASE_URL}/gamma-profile?range=${rangePercent}&auto=${autoRange}`),
+      ]);  
+        
 
       setMetrics({
         totalGEX: totalGEX.data.data,
@@ -91,7 +92,7 @@ export default function Home() {
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 5000); // Update every 5 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [rangePercent, autoRange]);
 
   if (loading || !metrics) {
     return (
@@ -291,11 +292,48 @@ export default function Home() {
         {/* Gamma Profile Chart */}
         <Card className="p-6 bg-card border-border">
           <div className="mb-6">
-            <h2 className="text-xl font-bold">Gamma Exposure Profile</h2>
-            <p className="text-sm text-muted-foreground">
-              Distribution of gamma exposure across strikes
-            </p>
-          </div>
+            <div className="flex items-center justify-between mb-4">            
+              <div>
+              <h2 className="text-xl font-bold">Gamma Exposure Profile</h2>
+              <p className="text-sm text-muted-foreground">
+                Distribution of gamma exposure across strikes
+              </p>
+           </div>                        
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={autoRange}
+                    onChange={(e) => setAutoRange(e.target.checked)}
+                    className="w-4 h-4 rounded border-border"
+                  />
+                  <span className="text-muted-foreground">Auto Range</span>
+                </label>
+              </div>
+            </div>
+            {!autoRange && (
+              <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                <label className="text-sm text-muted-foreground `min-w-20`">
+                  Range: ±{(rangePercent * 100).toFixed(0)}%
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="50"
+                  step="5"
+                  value={rangePercent * 100}
+                  onChange={(e) => setRangePercent(parseFloat(e.target.value) / 100)}
+                  className="flex-1 h-2 bg-border rounded-lg appearance-none cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, oklch(0.623 0.214 259.815) 0%, oklch(0.623 0.214 259.815) ${((rangePercent * 100 - 10) / 40) * 100}%, oklch(0.274 0.006 286.033) ${((rangePercent * 100 - 10) / 40) * 100}%, oklch(0.274 0.006 286.033) 100%)`
+                  }}
+                />
+                <span className="text-xs text-muted-foreground font-mono `min-w-15`] text-right">
+                  ±10% - ±50%
+                </span>
+              </div>
+            )}
+          </div>  
           <div className="h-100">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
