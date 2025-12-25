@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Activity, TrendingUp, TrendingDown, Target, Shield, AlertTriangle, BarChart3, Mountain } from "lucide-react";
+import LoadingScreen from "@/components/LoadingScreen";
 import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, ReferenceArea } from "recharts";
 import axios from "axios";
