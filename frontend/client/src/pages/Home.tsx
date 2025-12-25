@@ -141,11 +141,18 @@ export default function Home() {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container py-4">
           <div className="flex items-center justify-between">
+             <div className="flex items-center gap-4">
+              <img 
+                src="./../assets/logo-option-2.PNG" 
+                alt="Gamma Tracker Logo" 
+                className="w-16 h-16 object-contain"
+              />
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Gamma Tracker</h1>
               <p className="text-sm text-muted-foreground">
                 Real-time Options Market Analysis
               </p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <Link href="/volatility-surface">
