@@ -6,6 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const Logger = require('../utils/logger');
 const VolatilitySurfaceCalculator = require('../calculators/VolatilitySurfaceCalculator');
+const VolatilityAnomalyDetector = require('../calculators/VolatilityAnomalyDetector');
 
 
 class APIServer {
@@ -14,6 +15,7 @@ class APIServer {
     this.gexCalculator = gexCalculator;
     this.regimeAnalyzer = regimeAnalyzer;
     this.volSurfaceCalculator = new VolatilitySurfaceCalculator();
+    this.anomalyDetector = new VolatilityAnomalyDetector(this.logger);
 
     
     this.config = {
@@ -581,5 +583,95 @@ calculateWallZonesFromProfile(gammaProfile, threshold = 0.7) {
     });
   }
 }
+// Endpoint: Detectar anomalias na volatility surface
+this.app.get('/api/vol-anomalies', async (req, res) => {
+  try {
+    this.logger.info('[API] GET /api/vol-anomalies - Iniciando detecção de anomalias');
+    
+    // Obter todas as options
+    const options = this.dataCollector.getAllOptions();
+    
+    if (!options || options.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          anomalies: [],
+          stats: {
+            total: 0,
+            byType: { ivOutlier: 0, skewAnomaly: 0 },
+            bySeverity: { critical: 0, high: 0, medium: 0, low: 0 },
+            byPriceType: { overpriced: 0, underpriced: 0 },
+            avgRelevance: 0
+          },
+          threshold: 2.0,
+          spotPrice: 0
+        }
+      });
+    }
+    
+    // Construir superfície de volatilidade
+    const surfaceData = this.volSurfaceCalc.buildSurface(
+      options,
+      this.dataCollector.getSpotPrice()
+    );
+    
+    // Threshold configurável via query param (padrão: 2.0)
+    const threshold = parseFloat(req.query.threshold) || 2.0;
+    
+    // Limite de resultados (padrão: 50, máximo: 200)
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    
+    // Filtro por severidade (opcional)
+    const severityFilter = req.query.severity?.toUpperCase(); // CRITICAL, HIGH, MEDIUM, LOW
+    
+    // Filtro por tipo (opcional)
+    const typeFilter = req.query.type?.toUpperCase(); // IV_OUTLIER, SKEW_ANOMALY
+    
+    // Detectar anomalias
+    let anomalies = this.anomalyDetector.detectAnomalies(surfaceData, threshold);
+    
+    // Aplicar filtros
+    if (severityFilter) {
+      anomalies = anomalies.filter(a => a.severity === severityFilter);
+    }
+    
+    if (typeFilter) {
+      anomalies = anomalies.filter(a => a.type === typeFilter);
+    }
+    
+    // Gerar estatísticas
+    const stats = this.anomalyDetector.generateStats(anomalies);
+    
+    // Limitar resultados
+    const limitedAnomalies = anomalies.slice(0, limit);
+    
+    this.logger.info(`[API] Anomalias detectadas: ${anomalies.length} (retornando top ${limitedAnomalies.length})`);
+    
+    res.json({
+      success: true,
+      data: {
+        anomalies: limitedAnomalies,
+        stats,
+        threshold,
+        spotPrice: surfaceData.spotPrice,
+        filters: {
+          severity: severityFilter || 'ALL',
+          type: typeFilter || 'ALL',
+          limit
+        }
+      }
+    });
+    
+  } catch (error) {
+    this.logger.error('[API] Erro ao detectar anomalias:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+
+
 
 module.exports = APIServer;
