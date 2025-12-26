@@ -205,6 +205,11 @@ export default function VolatilitySkew() {
               <span className="font-medium">Back to 3D Surface</span>
             </button>
           </Link>
+          <Link href="/anomalies">
+            <button className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors">
+              <span className="font-medium">🔍 Anomalies</span>
+            </button>
+          </Link>
         </div>
         <h1 className="text-3xl font-bold text-slate-100 mb-2">
           Volatility Skew Analysis
