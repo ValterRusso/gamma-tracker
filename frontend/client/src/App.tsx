@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import VolatilitySurface from "./pages/VolatilitySurface";
 import VolatilitySkew from "./pages/VolatilitySkew";
+import Anomalies from "./pages/Anomalies";
 
 
 function Router() {
@@ -15,6 +16,7 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path={"/volatility-surface"} component={VolatilitySurface} />
       <Route path="/volatility-skew" component={VolatilitySkew} />
+      <Route path="/anomalies" component={Anomalies} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
