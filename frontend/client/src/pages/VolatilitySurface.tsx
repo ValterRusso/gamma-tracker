@@ -119,9 +119,9 @@ export default function VolatilitySurface() {
       colorscale: [
         [0, '#0ea5e9'],      // sky-500 (low IV)
         [0.1, '#06b6d4'],   // cyan-500
-        [0.15, '#10b981'],    // emerald-500
-        [0.2, '#f59e0b'],    // amber-500
-        [0.55, '#f97316'],   // orange-500
+        [0.30, '#10b981'],    // emerald-500
+        [0.40, '#f59e0b'],    // amber-500
+        [0.5, '#f97316'],   // orange-500
         [1, '#ef4444']       // red-500 (high IV)
       ] as any,
       colorbar: {
@@ -210,6 +210,11 @@ export default function VolatilitySurface() {
             <button className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors">
               <BarChart3 className="w-4 h-4" />
               <span className="font-medium">2D Skew Viewer</span>
+            </button>
+          </Link>
+          <Link href="/anomalies">
+            <button className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors">
+              <span className="font-medium">🔍 Anomalies</span>
             </button>
           </Link>
         </div>
