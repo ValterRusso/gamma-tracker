@@ -10,6 +10,11 @@ const RegimeAnalyzer = require('./calculators/RegimeAnalyzer');
 const APIServer = require('./api/server');
 const Logger = require('./utils/logger');
 
+// ← ADICIONAR: Imports do Database
+const Database = require('./database/Database');
+const DataPersistenceService = require('./database/services/DataPersistenceService');
+const DataRetentionService = require('./database/services/DataRetentionService');
+
 class GammaTracker {
   constructor(config = {}) {
     this.logger = new Logger('GammaTracker');
@@ -18,7 +23,10 @@ class GammaTracker {
     this.config = {
       underlying: config.underlying || process.env.DEFAULT_UNDERLYING || 'BTC',
       apiPort: config.apiPort || process.env.API_PORT || 3300,
-      spotPrice: config.spotPrice || 95000 // Preço inicial estimado para BTC
+      spotPrice: config.spotPrice || 95000, // Preço inicial estimado para BTC
+      // ← ADICIONAR: Configuração de persistência
+      enablePersistence: config.enablePersistence !== false, // Default: true
+      persistenceInterval: config.persistenceInterval || 10 * 60 * 1000 // 10 minutos
     };
     
     // Componentes
@@ -26,6 +34,12 @@ class GammaTracker {
     this.gexCalculator = null;
     this.regimeAnalyzer = null;
     this.apiServer = null;
+    
+    // ← ADICIONAR: Componentes de persistência
+    this.database = null;
+    this.persistence = null;
+    this.retention = null;
+    this.persistenceTimer = null;
   }
 
   /**
@@ -36,12 +50,17 @@ class GammaTracker {
     this.logger.info(`Underlying: ${this.config.underlying}`);
     
     try {
-      // 1. Inicializar calculadoras
+      // ← ADICIONAR: 1. Inicializar Database (PRIMEIRO)
+      if (this.config.enablePersistence) {
+        await this.initializeDatabase();
+      }
+      
+      // 2. Inicializar calculadoras
       this.gexCalculator = new GEXCalculator(this.config.spotPrice);
       this.regimeAnalyzer = new RegimeAnalyzer();
       this.logger.success('Calculadoras inicializadas');
       
-      // 2. Inicializar coletor de dados
+      // 3. Inicializar coletor de dados
       this.dataCollector = new DataCollector({
         underlying: this.config.underlying
       });
@@ -53,7 +72,12 @@ class GammaTracker {
       await this.dataCollector.start();
       this.logger.success('Coletor de dados iniciado');
       
-      // 3. Inicializar API Server
+      // ← ADICIONAR: 4. Iniciar loop de persistência (DEPOIS do start)
+      if (this.config.enablePersistence) {
+        this.startPersistenceLoop();
+      }
+      
+      // 5. Inicializar API Server
       this.apiServer = new APIServer(
         this.dataCollector,
         this.gexCalculator,
@@ -70,6 +94,89 @@ class GammaTracker {
     } catch (error) {
       this.logger.error('Erro ao inicializar Gamma Tracker', error);
       throw error;
+    }
+  }
+
+  // ← ADICIONAR: Método para inicializar database
+  async initializeDatabase() {
+    try {
+      this.logger.info('Inicializando Database...');
+      
+      // 1. Conectar ao MySQL
+      this.database = new Database();
+      await this.database.connect();
+      
+      // 2. Inicializar serviço de persistência
+      this.persistence = new DataPersistenceService(this.database);
+      await this.persistence.initialize(this.config.underlying);
+      
+      // 3. Inicializar serviço de retenção (cleanup automático a cada 24h)
+      this.retention = new DataRetentionService(this.database);
+      this.retention.startAutomatedCleanup(24);
+      
+      this.logger.success('✓ Database inicializado com persistência ativada');
+      
+    } catch (error) {
+      this.logger.error('Erro ao inicializar Database', error);
+      this.logger.warn('Sistema continuará SEM persistência');
+      this.config.enablePersistence = false;
+    }
+  }
+
+  // ← ADICIONAR: Loop de persistência
+  startPersistenceLoop() {
+    this.logger.info(`Iniciando loop de persistência (intervalo: ${this.config.persistenceInterval / 1000}s)`);
+    
+    // Executar imediatamente
+    this.saveSnapshot();
+    
+    // Agendar execuções periódicas
+    this.persistenceTimer = setInterval(() => {
+      this.saveSnapshot();
+    }, this.config.persistenceInterval);
+  }
+
+  // ← ADICIONAR: Método para salvar snapshot
+  async saveSnapshot() {
+    try {
+      // Obter dados atuais
+      const options = this.dataCollector.getAllOptions();
+      const spotPrice = this.dataCollector.getSpotPrice();
+      
+      if (!options || options.length === 0) {
+        this.logger.debug('Nenhuma option disponível para salvar');
+        return;
+      }
+      
+      // Calcular métricas
+      const metrics = this.gexCalculator.calculate(options, spotPrice);
+      
+      // Detectar anomalias (se disponível)
+      let anomalies = [];
+      if (this.apiServer && this.apiServer.anomalyDetector) {
+        const volSurface = this.apiServer.volSurfaceCalculator.buildSurface(options, spotPrice);
+        if (volSurface && volSurface.points) {
+          const anomalyResult = this.apiServer.anomalyDetector.detectAnomalies(
+            volSurface.points,
+            spotPrice,
+            { threshold: 2.0 }
+          );
+          anomalies = anomalyResult.anomalies || [];
+        }
+      }
+      
+      // Salvar no banco
+      await this.persistence.saveSnapshot({
+        options: options,
+        spotPrice: spotPrice,
+        metrics: metrics,
+        anomalies: anomalies
+      });
+      
+      this.logger.info(`✓ Snapshot salvo: ${options.length} options, ${anomalies.length} anomalias`);
+      
+    } catch (error) {
+      this.logger.error('Erro ao salvar snapshot', error);
     }
   }
 
@@ -128,6 +235,14 @@ class GammaTracker {
     console.log(`   Expirações Únicas: ${stats.uniqueExpiries}`);
     console.log(`   WebSocket: ${stats.wsConnected ? '✓ Conectado' : '✗ Desconectado'}`);
     
+    // ← ADICIONAR: Status de persistência
+    if (this.config.enablePersistence) {
+      console.log(`\n💾 Persistência:`);
+      console.log(`   Database: ${this.database ? '✓ Conectado' : '✗ Desconectado'}`);
+      console.log(`   Intervalo: ${this.config.persistenceInterval / 1000}s`);
+      console.log(`   Retenção: 7 dias (detalhado), 90 dias (anomalias)`);
+    }
+    
     console.log(`\n🌐 API Endpoints:`);
     console.log(`   Health: http://localhost:${this.config.apiPort}/health`);
     console.log(`   Status: http://localhost:${this.config.apiPort}/api/status`);
@@ -150,12 +265,33 @@ class GammaTracker {
     this.logger.info('Encerrando Gamma Tracker...');
     
     try {
+      // ← ADICIONAR: Parar loop de persistência
+      if (this.persistenceTimer) {
+        clearInterval(this.persistenceTimer);
+        this.persistenceTimer = null;
+      }
+      
+      // ← ADICIONAR: Salvar snapshot final antes de desligar
+      if (this.persistence) {
+        this.logger.info('Salvando snapshot final...');
+        await this.saveSnapshot();
+      }
+      
       if (this.apiServer) {
         await this.apiServer.stop();
       }
       
       if (this.dataCollector) {
         this.dataCollector.stop();
+      }
+      
+      // ← ADICIONAR: Desconectar database
+      if (this.retention) {
+        this.retention.stopAutomatedCleanup();
+      }
+      
+      if (this.database) {
+        await this.database.disconnect();
       }
       
       this.logger.success('Gamma Tracker encerrado');
@@ -191,5 +327,3 @@ if (require.main === module) {
 }
 
 module.exports = GammaTracker;
-
-
