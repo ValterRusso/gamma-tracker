@@ -60,7 +60,7 @@ class DataPersistenceService {
           totalOptions: options.length,
           totalVolume: this.calculateTotalVolume(options),
           totalOpenInterest: this.calculateTotalOI(options),
-          totalGex: metrics?.totalGEX || null,
+          totalGex: metrics?.totalGEX?.total || 0,
           maxGexStrike: metrics?.maxGEXStrike || null,
           regime: metrics?.regime || null
         }, { transaction: t });
@@ -89,27 +89,41 @@ class DataPersistenceService {
   
   async saveOptionsHistory(snapshotId, options, transaction) {
     const OptionsHistory = this.db.getModel('OptionsHistory');
+
+    // DEBUG: Ver primeiro item
+     this.logger.debug(`Tentando salvar ${options.length} options`);
+    if (options.length > 0) {
+      this.logger.debug('Primeira option:', JSON.stringify(options[0], null, 2));
+      this.logger.debug('Campos disponíveis:', Object.keys(options[0]));
+    }
     
-    const records = options.map(opt => ({
-      snapshotId: snapshotId,
-      assetId: this.currentAssetId,
-      symbol: opt.symbol,
-      strike: opt.strike,
-      expiryDate: opt.expiryDate,
-      dte: opt.dte,
-      side: opt.side || opt.type, // 'side' or 'type' field
-      markPrice: opt.markPrice,
-      markIv: opt.markIV,
-      underlyingPrice: opt.underlyingPrice,
-      delta: opt.delta,
-      gamma: opt.gamma,
-      theta: opt.theta,
-      vega: opt.vega,
-      volume: opt.volume,
-      openInterest: opt.openInterest,
-      bidPrice: opt.bidPrice,
-      askPrice: opt.askPrice
-    }));
+    const records = options.map(opt => {
+
+      const dte = opt.dte !== undefined
+         ? opt.dte
+         : Math.max(0, Math.ceil((opt.expiryDate - Date.now()) / (1000 * 60 * 60 * 24)));
+         
+      return {
+        snapshot_id: snapshotId,
+        asset_id: this.currentAssetId,
+        symbol: opt.symbol,
+        strike: opt.strike,
+        expiryDate: opt.expiryDate,
+        dte: dte,
+        side: opt.side || opt.type, // 'side' or 'type' field
+        markPrice: opt.markPrice,
+        markIv: opt.markIV,
+        underlyingPrice: opt.underlyingPrice,
+        delta: opt.delta,
+        gamma: opt.gamma,
+        theta: opt.theta,
+        vega: opt.vega,
+        volume: opt.volume,
+        openInterest: opt.openInterest,
+        bidPrice: opt.bidPrice,
+        askPrice: opt.askPrice
+      };
+    });
     
     // Bulk insert for performance
     await OptionsHistory.bulkCreate(records, { transaction });
