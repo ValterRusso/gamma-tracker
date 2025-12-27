@@ -128,32 +128,54 @@ class GammaTracker {
     this.logger.info(`Iniciando loop de persistência (intervalo: ${this.config.persistenceInterval / 1000}s)`);
     
     // Executar imediatamente
-    this.saveSnapshot();
+    setTimeout(() => {
+      this.saveSnapshot();
     
     // Agendar execuções periódicas
     this.persistenceTimer = setInterval(() => {
       this.saveSnapshot();
     }, this.config.persistenceInterval);
+   },30000); // Esperar 30s antes da primeira execução
   }
 
   // ← ADICIONAR: Método para salvar snapshot
   async saveSnapshot() {
+     this.logger.info('🔍 [DEBUG] saveSnapshot() chamado');
     try {
       // Obter dados atuais
       const options = this.dataCollector.getAllOptions();
-      const spotPrice = this.dataCollector.getSpotPrice();
+      this.logger.info(`🔍 [DEBUG] Options obtidas: ${options ? options.length : 0}`);
       
       if (!options || options.length === 0) {
-        this.logger.debug('Nenhuma option disponível para salvar');
-        return;
-      }
-      
-      // Calcular métricas
-      const metrics = this.gexCalculator.calculate(options, spotPrice);
-      
-      // Detectar anomalias (se disponível)
-      let anomalies = [];
-      if (this.apiServer && this.apiServer.anomalyDetector) {
+      this.logger.debug('Nenhuma option disponível para salvar');
+      return;
+    }
+     
+     // Obter spot price do stats
+      const stats = this.dataCollector.getStats();
+      const spotPrice = stats.spotPrice;
+      this.logger.info(`🔍 [DEBUG] Spot price: ${spotPrice}`);
+
+      if (!spotPrice || spotPrice <= 0) {
+      this.logger.debug('Spot price inválido (ainda não recebeu update do WebSocket)');
+      return;
+    }
+
+    this.logger.info('🔍 [DEBUG] Obtendo métricas do APIServer...');
+    // Usar o método getMetrics do APIServer (que já funciona!)
+    const metrics = await this.apiServer.getMetrics();
+
+    if (!metrics) {
+      this.logger.debug('Métricas não disponíveis');
+      return;
+    }
+
+    this.logger.info('🔍 [DEBUG] Detectando anomalias...');
+
+    // Detectar anomalias (se disponível)
+    let anomalies = [];
+    if (this.apiServer.anomalyDetector && this.apiServer.volSurfaceCalculator) {
+      try {
         const volSurface = this.apiServer.volSurfaceCalculator.buildSurface(options, spotPrice);
         if (volSurface && volSurface.points) {
           const anomalyResult = this.apiServer.anomalyDetector.detectAnomalies(
@@ -161,10 +183,14 @@ class GammaTracker {
             spotPrice,
             { threshold: 2.0 }
           );
-          anomalies = anomalyResult.anomalies || [];
+          anomalies = anomalyResult.anomalies || [];         
         }
+      } catch (error) {
+        this.logger.error('Erro ao detectar anomalias', error.message);
       }
-      
+    }     
+   
+      this.logger.info('🔍 [DEBUG] Salvando no banco...');
       // Salvar no banco
       await this.persistence.saveSnapshot({
         options: options,
