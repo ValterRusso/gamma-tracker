@@ -153,10 +153,9 @@ export default function Anomalies() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <Link href="/volatility-surface">
-              <a className="text-cyan-400 hover:text-cyan-300 text-sm mb-2 inline-flex items-center gap-2">
-                ← Back to 3D Surface
-              </a>
+            <Link href="/volatility-surface"
+               className="text-cyan-400 hover:text-cyan-300 text-sm mb-2 inline-flex items-center gap-2">
+                ← Back to 3D Surface              
             </Link>
             <h1 className="text-3xl font-bold text-white">Volatility Anomalies</h1>
             <p className="text-slate-400 mt-1">
