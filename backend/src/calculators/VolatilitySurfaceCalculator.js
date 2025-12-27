@@ -27,7 +27,8 @@ class VolatilitySurfaceCalculator {
       opt.markIV && 
       opt.markIV > 0 &&
       opt.strike > 0 &&
-      opt.expiryDate
+      opt.expiryDate &&
+      opt.expiryDate > now
     );
 
     this.logger.info(`Valid options with IV: ${validOptions.length}`);
