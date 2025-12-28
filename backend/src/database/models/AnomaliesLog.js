@@ -19,9 +19,10 @@ module.exports = (sequelize) => {
       field: 'asset_id',
       comment: 'FK to assets'
     },
-    type: {
+    anomalyType: {  // ← CORRIGIDO: era 'type', agora 'anomalyType'
       type: DataTypes.ENUM('IV_OUTLIER', 'SKEW_ANOMALY'),
       allowNull: false,
+      field: 'anomaly_type',  // ← ADICIONADO: mapeia para coluna anomaly_type
       comment: 'Anomaly type'
     },
     severity: {
@@ -124,7 +125,7 @@ module.exports = (sequelize) => {
     indexes: [
       { fields: ['snapshot_id'] },
       { fields: ['asset_id', 'severity'] },
-      { fields: ['type'] },
+      { fields: ['anomaly_type'] },  // ← CORRIGIDO: era 'type', agora 'anomaly_type'
       { fields: ['strike', 'dte'] },
       { fields: ['z_score'] },
       { fields: ['created_at'] }
