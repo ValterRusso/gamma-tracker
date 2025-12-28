@@ -31,7 +31,7 @@ CREATE TABLE assets (
 CREATE TABLE market_snapshots (
   id INT PRIMARY KEY AUTO_INCREMENT,
   asset_id INT NOT NULL COMMENT 'FK to assets',
-  timestamp BIGINT NOT NULL COMMENT 'Unix timestamp (ms)',
+  timestp BIGINT NOT NULL COMMENT 'Unix timestamp (ms)',
   spot_price DECIMAL(12,2) NOT NULL COMMENT 'Asset spot price',
   total_options INT NOT NULL COMMENT 'Number of active options',
   total_volume DECIMAL(18,8) COMMENT 'Total 24h volume',
@@ -44,8 +44,8 @@ CREATE TABLE market_snapshots (
   
   FOREIGN KEY (asset_id) REFERENCES assets(id),
   
-  INDEX idx_asset_timestamp (asset_id, timestamp),
-  INDEX idx_timestamp (timestamp),
+  INDEX idx_asset_timestamp (asset_id, timestp),
+  INDEX idx_timestamp (timestp),
   INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Market state snapshots';
 
@@ -60,7 +60,7 @@ CREATE TABLE options_history (
   
   symbol VARCHAR(50) NOT NULL COMMENT 'Option symbol (BTC-250131-95000-C)',
   strike DECIMAL(12,2) NOT NULL COMMENT 'Strike price',
-  expiry_date BIGINT NOT NULL COMMENT 'Expiry timestamp (ms)',
+  exp_date BIGINT NOT NULL COMMENT 'Expiry timestamp (ms)',
   dte INT NOT NULL COMMENT 'Days to expiration',
   side ENUM('CALL', 'PUT') NOT NULL COMMENT 'Option type',
   
@@ -68,10 +68,10 @@ CREATE TABLE options_history (
   mark_iv DECIMAL(8,6) COMMENT 'Implied volatility',
   underlying_price DECIMAL(12,2) COMMENT 'Underlying asset price',
   
-  delta DECIMAL(10,8) COMMENT 'Delta greek',
+  delta DECIMAL(12,8) COMMENT 'Delta greek',
   gamma DECIMAL(12,10) COMMENT 'Gamma greek',
-  theta DECIMAL(10,8) COMMENT 'Theta greek',
-  vega DECIMAL(10,8) COMMENT 'Vega greek',
+  theta DECIMAL(12,8) COMMENT 'Theta greek',
+  vega DECIMAL(12,8) COMMENT 'Vega greek',
   
   volume DECIMAL(18,8) COMMENT '24h volume',
   open_interest DECIMAL(18,8) COMMENT 'Open interest',
@@ -87,7 +87,7 @@ CREATE TABLE options_history (
   INDEX idx_snapshot (snapshot_id),
   INDEX idx_asset_strike_dte (asset_id, strike, dte),
   INDEX idx_symbol (symbol),
-  INDEX idx_expiry (expiry_date),
+  INDEX idx_expiry (exp_date),
   INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Options contracts historical data';
 
@@ -100,7 +100,7 @@ CREATE TABLE anomalies_log (
   snapshot_id INT NOT NULL COMMENT 'FK to market_snapshots',
   asset_id INT NOT NULL COMMENT 'FK to assets',
   
-  type ENUM('IV_OUTLIER', 'SKEW_ANOMALY') NOT NULL COMMENT 'Anomaly type',
+  anomaly_type ENUM('IV_OUTLIER', 'SKEW_ANOMALY') NOT NULL COMMENT 'Anomaly type',
   severity ENUM('CRITICAL', 'HIGH', 'MEDIUM', 'LOW') NOT NULL COMMENT 'Severity level',
   
   strike DECIMAL(12,2) NOT NULL COMMENT 'Strike price',
@@ -135,7 +135,7 @@ CREATE TABLE anomalies_log (
   
   INDEX idx_snapshot (snapshot_id),
   INDEX idx_asset_severity (asset_id, severity),
-  INDEX idx_type (type),
+  INDEX idx_anomaly_type (anomaly_type),
   INDEX idx_strike_dte (strike, dte),
   INDEX idx_z_score (z_score),
   INDEX idx_created_at (created_at)
