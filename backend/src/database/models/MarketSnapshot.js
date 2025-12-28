@@ -16,6 +16,7 @@ module.exports = (sequelize) => {
     timestamp: {
       type: DataTypes.BIGINT,
       allowNull: false,
+      field: 'timestamp',
       comment: 'Unix timestamp (ms)'
     },
     spotPrice: {
