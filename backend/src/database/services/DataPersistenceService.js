@@ -62,12 +62,12 @@ class DataPersistenceService {
           totalOpenInterest: this.calculateTotalOI(options),
           totalGex: metrics?.totalGEX?.total || 0,
           maxGexStrike: metrics?.maxGEXStrike || null,
-          regime: metrics?.regime || null
+          regime: metrics?.regime || 'NEUTRAL' // Default to NEUTRAL if not provided
         }, { transaction: t });
         
         // 2. Save options history
         if (options && options.length > 0) {
-          await this.saveOptionsHistory(snapshot.id, options, t);
+          await this.saveOptionsHistory(snapshot.id, options, spotPrice, t);
         }
         
         // 3. Save anomalies
@@ -87,41 +87,36 @@ class DataPersistenceService {
     }
   }
   
-  async saveOptionsHistory(snapshotId, options, transaction) {
+  async saveOptionsHistory(snapshotId, options, spotPrice, transaction) {
     const OptionsHistory = this.db.getModel('OptionsHistory');
-
-    // DEBUG: Ver primeiro item
-     this.logger.debug(`Tentando salvar ${options.length} options`);
-    if (options.length > 0) {
-      this.logger.debug('Primeira option:', JSON.stringify(options[0], null, 2));
-      this.logger.debug('Campos disponíveis:', Object.keys(options[0]));
-    }
     
     const records = options.map(opt => {
-
+      // Calculate DTE if not provided
       const dte = opt.dte !== undefined
          ? opt.dte
          : Math.max(0, Math.ceil((opt.expiryDate - Date.now()) / (1000 * 60 * 60 * 24)));
-         
+      
+      // IMPORTANT: Use camelCase for fields that have field: 'snake_case' in the model
+      // Sequelize will automatically map camelCase -> snake_case based on model definition
       return {
-        snapshot_id: snapshotId,
-        asset_id: this.currentAssetId,
+        snapshotId: snapshotId,           // Maps to snapshot_id
+        assetId: this.currentAssetId,     // Maps to asset_id
         symbol: opt.symbol,
         strike: opt.strike,
-        expiryDate: opt.expiryDate,
+        expiryDate: opt.expiryDate,       // Maps to expiry_date
         dte: dte,
-        side: opt.side || opt.type, // 'side' or 'type' field
-        markPrice: opt.markPrice,
-        markIv: opt.markIV,
-        underlyingPrice: opt.underlyingPrice,
+        side: opt.side || opt.type,
+        markPrice: opt.markPrice,         // Maps to mark_price
+        markIv: opt.markIV,               // Maps to mark_iv
+        underlyingPrice: spotPrice, // Maps to underlying_price
         delta: opt.delta,
         gamma: opt.gamma,
         theta: opt.theta,
         vega: opt.vega,
-        volume: opt.volume,
-        openInterest: opt.openInterest,
-        bidPrice: opt.bidPrice,
-        askPrice: opt.askPrice
+        volume: opt.volume || 0,          // Default to 0 if not provided
+        openInterest: opt.openInterest,   // Maps to open_interest
+        bidPrice: opt.bidPrice || null,   // Maps to bid_price
+        askPrice: opt.askPrice || null    // Maps to ask_price
       };
     });
     
@@ -135,28 +130,28 @@ class DataPersistenceService {
     const AnomaliesLog = this.db.getModel('AnomaliesLog');
     
     const records = anomalies.map(a => ({
-      snapshotId: snapshotId,
-      assetId: this.currentAssetId,
-      type: a.type,
-      severity: a.severity,
-      strike: a.strike,
-      dte: a.dte,
-      moneyness: a.moneyness,
-      iv: a.iv,
-      callIv: a.callIV,
-      putIv: a.putIV,
-      expectedIv: a.expectedIV,
-      deviation: a.deviation,
-      deviationPct: a.deviationPct,
-      zScore: a.zScore,
-      spread: a.spread,
-      expectedSpread: a.expectedSpread,
-      priceType: a.priceType,
-      skewType: a.skewType,
-      isWing: a.isWing || false,
-      relevanceScore: a.relevanceScore,
-      volume: a.volume,
-      openInterest: a.openInterest
+      snapshotId: snapshotId,           // Maps to snapshot_id
+      assetId: this.currentAssetId,     // Maps to asset_id
+      anomalyType: a.type || a.anomalyType, // Maps to anomaly_type
+      severity: a.severity || 'MEDIUM',
+      strike: a.strike || null,
+      dte: a.dte || null,
+      moneyness: a.moneyness || null,
+      iv: a.iv || null,
+      callIv: a.callIV || null,         // Maps to call_iv
+      putIv: a.putIV || null,           // Maps to put_iv
+      expectedIv: a.expectedIV || null, // Maps to expected_iv
+      deviation: a.deviation || null,
+      deviationPct: a.deviationPct || null, // Maps to deviation_pct
+      zScore: a.zScore || null,         // Maps to z_score
+      spread: a.spread || null,
+      expectedSpread: a.expectedSpread || null, // Maps to expected_spread
+      priceType: a.priceType || null,   // Maps to price_type
+      skewType: a.skewType || null,     // Maps to skew_type
+      isWing: a.isWing || false,        // Maps to is_wing
+      relevanceScore: a.relevanceScore || null, // Maps to relevance_score
+      volume: a.volume || null,
+      openInterest: a.openInterest || null // Maps to open_interest
     }));
     
     await AnomaliesLog.bulkCreate(records, { transaction });
