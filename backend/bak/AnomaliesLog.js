@@ -13,7 +13,7 @@ module.exports = (sequelize) => {
       field: 'snapshot_id',
       comment: 'FK to market_snapshots'
     },
-    assetId: {
+    assetId: { 
       type: DataTypes.INTEGER,
       allowNull: false,
       field: 'asset_id',
