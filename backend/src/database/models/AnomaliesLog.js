@@ -19,10 +19,10 @@ module.exports = (sequelize) => {
       field: 'asset_id',
       comment: 'FK to assets'
     },
-    anomalyType: {  // ← CORRIGIDO: era 'type', agora 'anomalyType'
+    anomalyType: {
       type: DataTypes.ENUM('IV_OUTLIER', 'SKEW_ANOMALY'),
       allowNull: false,
-      field: 'anomaly_type',  // ← ADICIONADO: mapeia para coluna anomaly_type
+      field: 'anomaly_type',
       comment: 'Anomaly type'
     },
     severity: {
@@ -116,6 +116,27 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(18, 8),
       field: 'open_interest',
       comment: 'Open interest'
+    },
+    // ========== NEW FIELDS ==========
+    oiVolumeRatio: {
+      type: DataTypes.DECIMAL(10, 4),
+      field: 'oi_volume_ratio',
+      comment: 'OI/Volume ratio - indicates position age (high = old positions, low = new activity)'
+    },
+    spreadPct: {
+      type: DataTypes.DECIMAL(8, 4),
+      field: 'spread_pct',
+      comment: 'Bid/Ask spread percentage - indicates liquidity (high = illiquid)'
+    },
+    bidPrice: {
+      type: DataTypes.DECIMAL(18, 8),
+      field: 'bid_price',
+      comment: 'Bid price'
+    },
+    askPrice: {
+      type: DataTypes.DECIMAL(18, 8),
+      field: 'ask_price',
+      comment: 'Ask price'
     }
   }, {
     tableName: 'anomalies_log',
@@ -125,10 +146,12 @@ module.exports = (sequelize) => {
     indexes: [
       { fields: ['snapshot_id'] },
       { fields: ['asset_id', 'severity'] },
-      { fields: ['anomaly_type'] },  // ← CORRIGIDO: era 'type', agora 'anomaly_type'
+      { fields: ['anomaly_type'] },
       { fields: ['strike', 'dte'] },
       { fields: ['z_score'] },
-      { fields: ['created_at'] }
+      { fields: ['created_at'] },
+      { fields: ['oi_volume_ratio'] },  // NEW INDEX
+      { fields: ['spread_pct'] }         // NEW INDEX
     ]
   });
 
