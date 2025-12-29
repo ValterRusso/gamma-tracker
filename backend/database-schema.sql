@@ -31,7 +31,7 @@ CREATE TABLE assets (
 CREATE TABLE market_snapshots (
   id INT PRIMARY KEY AUTO_INCREMENT,
   asset_id INT NOT NULL COMMENT 'FK to assets',
-  timestp BIGINT NOT NULL COMMENT 'Unix timestamp (ms)',
+  timestamp BIGINT NOT NULL COMMENT 'Unix timestamp (ms)',
   spot_price DECIMAL(12,2) NOT NULL COMMENT 'Asset spot price',
   total_options INT NOT NULL COMMENT 'Number of active options',
   total_volume DECIMAL(18,8) COMMENT 'Total 24h volume',
@@ -44,8 +44,8 @@ CREATE TABLE market_snapshots (
   
   FOREIGN KEY (asset_id) REFERENCES assets(id),
   
-  INDEX idx_asset_timestamp (asset_id, timestp),
-  INDEX idx_timestamp (timestp),
+  INDEX idx_asset_timestamp (asset_id, timestamp),
+  INDEX idx_timestamp (timestamp),
   INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Market state snapshots';
 
@@ -60,7 +60,7 @@ CREATE TABLE options_history (
   
   symbol VARCHAR(50) NOT NULL COMMENT 'Option symbol (BTC-250131-95000-C)',
   strike DECIMAL(12,2) NOT NULL COMMENT 'Strike price',
-  exp_date BIGINT NOT NULL COMMENT 'Expiry timestamp (ms)',
+  expiry_date BIGINT NOT NULL COMMENT 'Expiry timestamp (ms)',
   dte INT NOT NULL COMMENT 'Days to expiration',
   side ENUM('CALL', 'PUT') NOT NULL COMMENT 'Option type',
   
@@ -87,7 +87,7 @@ CREATE TABLE options_history (
   INDEX idx_snapshot (snapshot_id),
   INDEX idx_asset_strike_dte (asset_id, strike, dte),
   INDEX idx_symbol (symbol),
-  INDEX idx_expiry (exp_date),
+  INDEX idx_expiry (expiry_date),
   INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Options contracts historical data';
 
