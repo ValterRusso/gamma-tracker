@@ -7,6 +7,8 @@ require('dotenv').config();
 const DataCollector = require('./collectors/DataCollector');
 const GEXCalculator = require('./calculators/GEXCalculator');
 const RegimeAnalyzer = require('./calculators/RegimeAnalyzer');
+const MaxPainCalculator = require('./calculators/MaxPainCalculator');
+const SentimentAnalyzer = require('./calculators/SentimentAnalyzer');
 const APIServer = require('./api/server');
 const Logger = require('./utils/logger');
 
@@ -33,6 +35,8 @@ class GammaTracker {
     this.dataCollector = null;
     this.gexCalculator = null;
     this.regimeAnalyzer = null;
+    this.maxPainCalculator = null;
+    this.sentimentAnalyzer = null;
     this.apiServer = null;
     
     // ← ADICIONAR: Componentes de persistência
@@ -58,6 +62,8 @@ class GammaTracker {
       // 2. Inicializar calculadoras
       this.gexCalculator = new GEXCalculator(this.config.spotPrice);
       this.regimeAnalyzer = new RegimeAnalyzer();
+      this.maxPainCalculator = new MaxPainCalculator();
+      this.sentimentAnalyzer = new SentimentAnalyzer();
       this.logger.success('Calculadoras inicializadas');
       
       // 3. Inicializar coletor de dados
@@ -82,6 +88,7 @@ class GammaTracker {
         this.dataCollector,
         this.gexCalculator,
         this.regimeAnalyzer,
+        this.database,
         { port: this.config.apiPort }
       );
       
@@ -178,16 +185,40 @@ class GammaTracker {
       try {
         const volSurface = this.apiServer.volSurfaceCalculator.buildSurface(options, spotPrice);
         if (volSurface && volSurface.points) {
-          const anomalyResult = this.apiServer.anomalyDetector.detectAnomalies(
-            volSurface.points,
-            spotPrice,
-            { threshold: 2.0 }
+          // detectAnomalies expects (surfaceData, threshold)
+          const anomalies_detected = this.apiServer.anomalyDetector.detectAnomalies(
+            volSurface,  // Pass entire volSurface object, not just points
+            2.0          // threshold
           );
-          anomalies = anomalyResult.anomalies || [];         
+          anomalies = anomalies_detected || [];         
         }
       } catch (error) {
         this.logger.error('Erro ao detectar anomalias', error.message);
       }
+    }
+    
+    // Calcular Max Pain
+    this.logger.info('🔍 [DEBUG] Calculando Max Pain...');
+    let maxPainData = null;
+    try {
+      maxPainData = this.maxPainCalculator.calculateMaxPain(options, spotPrice);
+      if (maxPainData) {
+        this.logger.info(`Max Pain: Strike ${maxPainData.maxPainStrike} com ${maxPainData.maxPainOI.toFixed(0)} OI`);
+      }
+    } catch (error) {
+      this.logger.error('Erro ao calcular Max Pain', error.message);
+    }
+    
+    // Analisar Sentimento
+    this.logger.info('🔍 [DEBUG] Analisando sentimento...');
+    let sentimentData = null;
+    try {
+      sentimentData = this.sentimentAnalyzer.analyzeSentiment(options);
+      if (sentimentData) {
+        this.logger.info(`Sentimento: ${sentimentData.sentiment} (P/C OI: ${sentimentData.putCallOIRatio.toFixed(2)})`);
+      }
+    } catch (error) {
+      this.logger.error('Erro ao analisar sentimento', error.message);
     }     
    
       this.logger.info('🔍 [DEBUG] Salvando no banco...');
@@ -196,7 +227,9 @@ class GammaTracker {
         options: options,
         spotPrice: spotPrice,
         metrics: metrics,
-        anomalies: anomalies
+        anomalies: anomalies,
+        maxPain: maxPainData,
+        sentiment: sentimentData
       });
       
       this.logger.info(`✓ Snapshot salvo: ${options.length} options, ${anomalies.length} anomalias`);
