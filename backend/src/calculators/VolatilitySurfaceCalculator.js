@@ -22,13 +22,32 @@ class VolatilitySurfaceCalculator {
       return null;
     }
 
+    this.logger.info(`expiryDate type sample: ${typeof options?.[0]?.expiryDate}`);
+    this.logger.info(`expiryDate value sample: ${options?.[0]?.expiryDate}`);
+
+    const nowMs = new Date();
+    // 00:00 UTC do próximo dia
+    const tomorrowStartUtcMs = new Date(Date.now());
+    tomorrowStartUtcMs.setUTCHours(24, 0, 0, 0); // Início do próximo dia em UTC
+    const minExpiryMs = tomorrowStartUtcMs.getTime();
+
+    this.logger.info(`now=${new Date(nowMs).toISOString()} minExpiry=${new Date(minExpiryMs).toISOString()}`);
+
+    const expiries = options.map(o => o.expiryDate).filter(Number.isFinite);
+    const minExp = Math.min(...expiries);
+
+    this.logger.info(
+      `Earliest expiry in chain: ${new Date(minExp).toISOString()}`
+    );  
+
+
     // 1. Filtrar options válidas (com IV)
     const validOptions = options.filter(opt => 
       opt.markIV && 
       opt.markIV > 0 &&
       opt.strike > 0 &&
-      opt.expiryDate 
-      // opt.expiryDate > now
+      Number.isFinite(opt.expiryDate) &&      
+      opt.expiryDate >= minExpiryMs      
     );
 
     this.logger.info(`Valid options with IV: ${validOptions.length}`);
