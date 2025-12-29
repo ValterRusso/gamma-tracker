@@ -111,13 +111,17 @@ class VolatilitySurfaceCalculator {
         point.calls.push({
           iv: opt.markIV,
           volume: opt.volume || 0,
-          openInterest: opt.openInterest || 0
+          openInterest: opt.openInterest || 0,
+          bidPrice: opt.bidPrice || null,
+          askPrice: opt.askPrice || null
         });
       } else if (opt.type === 'PUT') {
         point.puts.push({
           iv: opt.markIV,
           volume: opt.volume || 0,
-          openInterest: opt.openInterest || 0
+          openInterest: opt.openInterest || 0,
+          bidPrice: opt.bidPrice || null,
+          askPrice: opt.askPrice || null
         });
       } else {
         this.logger.warn(`Option com type inválido: ${opt.symbol}, type: ${opt.type}`);
@@ -152,6 +156,23 @@ class VolatilitySurfaceCalculator {
         return weightedSum / totalOI;
       };
 
+      // Calculate aggregated volume and OI
+      const totalVolume = [...point.calls, ...point.puts].reduce((sum, o) => sum + o.volume, 0);
+      const totalOI = [...point.calls, ...point.puts].reduce((sum, o) => sum + o.openInterest, 0);
+      
+      // Get bid/ask prices from option with highest OI (most liquid)
+      const allOptions = [...point.calls, ...point.puts];
+      if (allOptions.length > 0) {
+        const optionWithMaxOI = allOptions.reduce((max, o) => 
+          (o.openInterest || 0) > (max.openInterest || 0) ? o : max
+        , allOptions[0]);
+        var bidPrice = optionWithMaxOI.bidPrice || null;
+        var askPrice = optionWithMaxOI.askPrice || null;
+      } else {
+        var bidPrice = null;
+        var askPrice = null;
+      }
+      
       return {
         dte: point.dte,
         strike: point.strike,
@@ -159,7 +180,11 @@ class VolatilitySurfaceCalculator {
         expiryDate: point.expiryDate,
         callIV: calcWeightedIV(point.calls),
         putIV: calcWeightedIV(point.puts),
-        avgIV: calcWeightedIV([...point.calls, ...point.puts])
+        avgIV: calcWeightedIV([...point.calls, ...point.puts]),
+        volume: totalVolume,
+        openInterest: totalOI,
+        bidPrice: bidPrice,
+        askPrice: askPrice
       };
     });
 
