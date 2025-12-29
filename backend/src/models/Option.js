@@ -28,6 +28,12 @@ class Option {
     // Open Interest (será atualizado separadamente)
     this.openInterest = parseFloat(data.openInterest || 0);
     
+    // Volume e Bid/Ask (NOVO - será atualizado via fetchTicker)
+    this.volume = parseFloat(data.volume || 0);
+    this.bidPrice = data.bidPrice !== undefined ? parseFloat(data.bidPrice) : null;
+    this.askPrice = data.askPrice !== undefined ? parseFloat(data.askPrice) : null;
+    this.lastPrice = data.lastPrice !== undefined ? parseFloat(data.lastPrice) : null;
+    
     // Timestamp da última atualização
     this.lastUpdate = Date.now();
   }
@@ -91,6 +97,25 @@ class Option {
   }
 
   /**
+   * Atualiza dados de ticker (volume, bid, ask) - NOVO MÉTODO
+   */
+  updateTicker(tickerData) {
+    if (tickerData.volume !== undefined) {
+      this.volume = parseFloat(tickerData.volume) || 0;
+    }
+    if (tickerData.bidPrice !== undefined) {
+      this.bidPrice = tickerData.bidPrice !== null ? parseFloat(tickerData.bidPrice) : null;
+    }
+    if (tickerData.askPrice !== undefined) {
+      this.askPrice = tickerData.askPrice !== null ? parseFloat(tickerData.askPrice) : null;
+    }
+    if (tickerData.lastPrice !== undefined) {
+      this.lastPrice = tickerData.lastPrice !== null ? parseFloat(tickerData.lastPrice) : null;
+    }
+    this.lastUpdate = Date.now();
+  }
+
+  /**
    * Verifica se a option está expirada
    */
   isExpired() {
@@ -122,6 +147,10 @@ class Option {
       theta: this.theta,
       vega: this.vega,
       openInterest: this.openInterest,
+      volume: this.volume,           // NOVO
+      bidPrice: this.bidPrice,       // NOVO
+      askPrice: this.askPrice,       // NOVO
+      lastPrice: this.lastPrice,     // NOVO
       lastUpdate: this.lastUpdate
     };
   }
