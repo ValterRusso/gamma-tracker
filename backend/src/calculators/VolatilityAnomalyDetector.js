@@ -115,6 +115,14 @@ class VolatilityAnomalyDetector {
         // Determinar severidade
         const severity = this.calculateSeverity(zScore, relevanceScore, isWing);
         
+        // Calculate OI/Volume ratio
+        const oiVolRatio = point.volume > 0 ? (point.openInterest || 0) / point.volume : null;
+        
+        // Calculate spread percentage (from bid/ask if available)
+        const spreadPct = point.bidPrice && point.askPrice && point.askPrice > 0
+          ? ((point.askPrice - point.bidPrice) / point.askPrice) * 100
+          : null;
+        
         anomalies.push({
           type: 'IV_OUTLIER',
           strike: point.strike,
@@ -133,6 +141,10 @@ class VolatilityAnomalyDetector {
           relevanceScore: parseFloat(relevanceScore.toFixed(2)),
           volume: point.volume || 0,
           openInterest: point.openInterest || 0,
+          oiVolumeRatio: oiVolRatio ? parseFloat(oiVolRatio.toFixed(2)) : null,
+          spreadPct: spreadPct ? parseFloat(spreadPct.toFixed(2)) : null,
+          bidPrice: point.bidPrice || null,
+          askPrice: point.askPrice || null,
           expiryDate: point.expiryDate
         });
       }
@@ -170,6 +182,14 @@ class VolatilityAnomalyDetector {
         const relevanceScore = this.calculateRelevance(point);
         const severity = this.calculateSeverity(zScore, relevanceScore, false);
         
+        // Calculate OI/Volume ratio
+        const oiVolRatio = point.volume > 0 ? (point.openInterest || 0) / point.volume : null;
+        
+        // Calculate bid/ask spread percentage
+        const bidAskSpreadPct = point.bidPrice && point.askPrice && point.askPrice > 0
+          ? ((point.askPrice - point.bidPrice) / point.askPrice) * 100
+          : null;
+        
         anomalies.push({
           type: 'SKEW_ANOMALY',
           strike: point.strike,
@@ -186,6 +206,10 @@ class VolatilityAnomalyDetector {
           relevanceScore: parseFloat(relevanceScore.toFixed(2)),
           volume: point.volume || 0,
           openInterest: point.openInterest || 0,
+          oiVolumeRatio: oiVolRatio ? parseFloat(oiVolRatio.toFixed(2)) : null,
+          spreadPct: bidAskSpreadPct ? parseFloat(bidAskSpreadPct.toFixed(2)) : null,
+          bidPrice: point.bidPrice || null,
+          askPrice: point.askPrice || null,
           expiryDate: point.expiryDate
         });
       }
