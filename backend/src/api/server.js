@@ -7,16 +7,19 @@ const cors = require('cors');
 const Logger = require('../utils/logger');
 const VolatilitySurfaceCalculator = require('../calculators/VolatilitySurfaceCalculator');
 const VolatilityAnomalyDetector = require('../calculators/VolatilityAnomalyDetector');
+const MaxPainCalculator = require('../calculators/MaxPainCalculator');
+const SentimentAnalyzer = require('../calculators/SentimentAnalyzer');
 
 
 class APIServer {
-  constructor(dataCollector, gexCalculator, regimeAnalyzer, config = {}) {
+  constructor(dataCollector, gexCalculator, regimeAnalyzer, database, config = {}) {
     this.dataCollector = dataCollector;
     this.gexCalculator = gexCalculator;
     this.regimeAnalyzer = regimeAnalyzer;
+    this.db = database;
     this.volSurfaceCalculator = new VolatilitySurfaceCalculator();
-   
-
+    this.maxPainCalculator = new MaxPainCalculator(this.logger);
+    this.sentimentAnalyzer = new SentimentAnalyzer(this.logger);
     
     this.config = {
       port: config.port || process.env.API_PORT || 3300,
@@ -509,6 +512,308 @@ this.app.get('/api/expiries', (req, res) => {
   }
 });
 
+  // Max Pain endpoint
+  this.app.get('/api/max-pain', async (req, res) => {
+    try {
+      const options = this.dataCollector.getAllOptions();
+      const spotPrice = this.dataCollector.spotPrice;
+      
+      if (!options || options.length === 0) {
+        return res.json({
+          success: false,
+          error: 'Nenhuma option disponível'
+        });
+      }
+      
+      // Calcular Max Pain
+      const maxPain = this.maxPainCalculator.calculateMaxPain(options, spotPrice);
+      
+      if (!maxPain) {
+        return res.json({
+          success: false,
+          error: 'Não foi possível calcular Max Pain'
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: {
+          maxPainStrike: maxPain.maxPainStrike,
+          maxPainOI: maxPain.maxPainOI,
+          maxPainCallOI: maxPain.maxPainCallOI,
+          maxPainPutOI: maxPain.maxPainPutOI,
+          spotPrice: spotPrice,
+          analysis: maxPain.analysis,
+          topStrikes: maxPain.strikeOIMap ? 
+            Object.entries(maxPain.strikeOIMap)
+              .sort((a, b) => b[1].totalOI - a[1].totalOI)
+              .slice(0, 10)
+              .map(([strike, data]) => ({
+                strike: parseFloat(strike),
+                totalOI: data.totalOI,
+                callOI: data.callOI,
+                putOI: data.putOI
+              })) : []
+        }
+      });
+    } catch (error) {
+      this.logger.error('Erro ao obter Max Pain', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+  
+  // Sentiment Analysis endpoint
+  this.app.get('/api/sentiment', async (req, res) => {
+    try {
+      const options = this.dataCollector.getAllOptions();
+      
+      if (!options || options.length === 0) {
+        return res.json({
+          success: false,
+          error: 'Nenhuma option disponível'
+        });
+      }
+      
+      // Calcular Sentiment
+      const sentiment = this.sentimentAnalyzer.analyzeSentiment(options);
+      
+      if (!sentiment) {
+        return res.json({
+          success: false,
+          error: 'Não foi possível analisar sentimento'
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: sentiment
+      });
+    } catch (error) {
+      this.logger.error('Erro ao obter sentimento', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Anomalies endpoint with filters
+  this.app.get('/api/anomalies', async (req, res) => {
+    try {
+      const AnomaliesLog = this.db.getModel('AnomaliesLog');
+      const { Op } = require('sequelize');
+      
+      // Query parameters
+      const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+      const offset = parseInt(req.query.offset) || 0;
+      const anomalyType = req.query.type; // IV_OUTLIER, SKEW_ANOMALY, etc.
+      const minZScore = parseFloat(req.query.minZScore) || 0;
+      const maxSpread = parseFloat(req.query.maxSpread); // Filter by liquidity
+      const minOIVolRatio = parseFloat(req.query.minOIVolRatio); // Filter by position age
+      const minDTE = parseInt(req.query.minDTE);
+      const maxDTE = parseInt(req.query.maxDTE);
+      
+      // Build where clause
+      const where = {};
+      
+      if (anomalyType) {
+        where.anomaly_type = anomalyType;
+      }
+      
+      if (minZScore > 0) {
+        where.z_score = { [Op.gte]: minZScore };
+      }
+      
+      if (maxSpread) {
+        where.spread_pct = { [Op.lte]: maxSpread };
+      }
+      
+      if (minOIVolRatio) {
+        where.oi_volume_ratio = { [Op.gte]: minOIVolRatio };
+      }
+      
+      if (minDTE || maxDTE) {
+        where.dte = {};
+        if (minDTE) where.dte[Op.gte] = minDTE;
+        if (maxDTE) where.dte[Op.lte] = maxDTE;
+      }
+      
+      // Query anomalies
+      const anomalies = await AnomaliesLog.findAll({
+        where: where,
+        order: [['created_at', 'DESC']],
+        limit: limit,
+        offset: offset
+      });
+      
+      // Count total
+      const total = await AnomaliesLog.count({ where: where });
+      
+      // Group by type for summary
+      const summary = await AnomaliesLog.findAll({
+        attributes: [
+          'anomaly_type',
+          [this.db.sequelize.fn('COUNT', this.db.sequelize.col('id')), 'count'],
+          [this.db.sequelize.fn('AVG', this.db.sequelize.col('z_score')), 'avg_z_score']
+        ],
+        where: where,
+        group: ['anomaly_type'],
+        raw: true
+      });
+      
+      res.json({
+        success: true,
+        data: anomalies,
+        pagination: {
+          total: total,
+          limit: limit,
+          offset: offset,
+          hasMore: (offset + limit) < total
+        },
+        summary: summary
+      });
+    } catch (error) {
+      this.logger.error('Erro ao obter anomalias', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Market History endpoint
+  this.app.get('/api/market-history', async (req, res) => {
+    try {
+      const MarketSnapshot = this.db.getModel('MarketSnapshot');
+      const { Op } = require('sequelize');
+      
+      // Query parameters
+      const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
+      const hours = parseInt(req.query.hours) || 24; // Last N hours
+      const fields = req.query.fields ? req.query.fields.split(',') : null;
+      
+      // Calculate time range
+      const startTime = Date.now() - (hours * 60 * 60 * 1000);
+      
+      // Build attributes list
+      const attributes = fields || [
+        'id', 'timestamp', 'spot_price', 'total_options',
+        'total_gex', 'max_gex_strike', 'regime',
+        'max_pain_strike', 'max_pain_oi', 'max_pain_distance', 'max_pain_distance_pct',
+        'sentiment', 'put_call_oi_ratio', 'put_call_vol_ratio'
+      ];
+      
+      // Query snapshots
+      const snapshots = await MarketSnapshot.findAll({
+        attributes: attributes,
+        where: {
+          timestamp: { [Op.gte]: startTime }
+        },
+        order: [['timestamp', 'DESC']],
+        limit: limit
+      });
+      
+      res.json({
+        success: true,
+        data: snapshots,
+        count: snapshots.length,
+        timeRange: {
+          start: startTime,
+          end: Date.now(),
+          hours: hours
+        }
+      });
+    } catch (error) {
+      this.logger.error('Erro ao obter histórico de mercado', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+  
+  // Regime History endpoint
+  this.app.get('/api/regime-history', async (req, res) => {
+    try {
+      const MarketSnapshot = this.db.getModel('MarketSnapshot');
+      const { Op } = require('sequelize');
+      
+      // Query parameters
+      const hours = parseInt(req.query.hours) || 24;
+      const startTime = Date.now() - (hours * 60 * 60 * 1000);
+      
+      // Query regime changes
+      const snapshots = await MarketSnapshot.findAll({
+        attributes: ['timestamp', 'regime', 'spot_price', 'total_gex'],
+        where: {
+          timestamp: { [Op.gte]: startTime },
+          regime: { [Op.ne]: null }
+        },
+        order: [['timestamp', 'ASC']]
+      });
+      
+      // Detect regime changes
+      const regimeChanges = [];
+      let lastRegime = null;
+      
+      snapshots.forEach(snapshot => {
+        if (snapshot.regime !== lastRegime) {
+          regimeChanges.push({
+            timestamp: snapshot.timestamp,
+            regime: snapshot.regime,
+            spotPrice: snapshot.spot_price,
+            totalGex: snapshot.total_gex
+          });
+          lastRegime = snapshot.regime;
+        }
+      });
+      
+      // Calculate regime duration statistics
+      const regimeStats = {};
+      for (let i = 0; i < regimeChanges.length; i++) {
+        const regime = regimeChanges[i].regime;
+        const duration = i < regimeChanges.length - 1 
+          ? regimeChanges[i + 1].timestamp - regimeChanges[i].timestamp
+          : Date.now() - regimeChanges[i].timestamp;
+        
+        if (!regimeStats[regime]) {
+          regimeStats[regime] = {
+            count: 0,
+            totalDuration: 0,
+            avgDuration: 0
+          };
+        }
+        
+        regimeStats[regime].count++;
+        regimeStats[regime].totalDuration += duration;
+        regimeStats[regime].avgDuration = regimeStats[regime].totalDuration / regimeStats[regime].count;
+      }
+      
+      res.json({
+        success: true,
+        data: {
+          currentRegime: lastRegime,
+          regimeChanges: regimeChanges,
+          regimeStats: regimeStats,
+          timeRange: {
+            start: startTime,
+            end: Date.now(),
+            hours: hours
+          }
+        }
+      });
+    } catch (error) {
+      this.logger.error('Erro ao obter histórico de regime', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // 404 handler
   this.app.use((req, res) => {
     res.status(404).json({
@@ -537,6 +842,18 @@ async getMetrics() {
   this.gexCalculator.setSpotPrice(spotPrice);
   
   const metrics = this.gexCalculator.calculateAllMetrics(options);
+  
+  // Add regime analysis
+  try {
+    const regimeAnalysis = this.regimeAnalyzer.analyzeRegime(metrics);
+    // Truncate regime to max 20 characters to fit database column
+    const regime = regimeAnalysis.regime || '';
+    metrics.regime = regime.substring(0, 20);
+    metrics.regimeAnalysis = regimeAnalysis;
+  } catch (error) {
+    this.logger.error('Erro ao analisar regime', error);
+    metrics.regime = null;
+  }
   
   // Atualizar cache
   this.metricsCache = metrics;
