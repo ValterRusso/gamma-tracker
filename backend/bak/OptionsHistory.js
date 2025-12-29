@@ -27,7 +27,7 @@ module.exports = (sequelize) => {
     strike: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
-      comment: 'Strike price'
+      comment: 'Strike price' 
     },
     expiryDate: {
       type: DataTypes.BIGINT,
