@@ -1,49 +1,58 @@
 const Logger = require('../../utils/logger');
 
+/**
+ * DataPersistenceService
+ * Gerencia persistência de dados no banco MySQL
+ */
 class DataPersistenceService {
   constructor(database) {
     this.db = database;
     this.logger = new Logger('DataPersistence');
     this.currentAssetId = null;
   }
-  
-  async initialize(assetSymbol = 'BTC') {
+
+  /**
+   * Inicializa o serviço e garante que o asset existe
+   */
+  async initialize(underlying = 'BTC') {
     try {
-      // Get or create asset
       const Asset = this.db.getModel('Asset');
-      let asset = await Asset.findOne({ where: { symbol: assetSymbol } });
       
-      if (!asset) {
-        asset = await Asset.create({
-          symbol: assetSymbol,
-          name: this.getAssetName(assetSymbol),
-          isActive: true
-        });
-        this.logger.info(`Asset criado: ${assetSymbol}`);
-      }
+      // Buscar ou criar asset
+      let [asset, created] = await Asset.findOrCreate({
+        where: { symbol: underlying },
+        defaults: {
+          symbol: underlying,
+          name: this.getAssetName(underlying),
+          type: 'CRYPTO'
+        }
+      });
       
       this.currentAssetId = asset.id;
-      this.logger.info(`DataPersistence inicializado para ${assetSymbol} (ID: ${this.currentAssetId})`);
       
-      return true;
+      if (created) {
+        this.logger.info(`Asset criado: ${underlying} (ID: ${asset.id})`);
+      } else {
+        this.logger.info(`Asset encontrado: ${underlying} (ID: ${asset.id})`);
+      }
+      
     } catch (error) {
       this.logger.error('Erro ao inicializar DataPersistence', error);
       throw error;
     }
   }
-  
+
   getAssetName(symbol) {
     const names = {
       'BTC': 'Bitcoin',
-      'ETH': 'Ethereum',
-      'SOL': 'Solana'
+      'ETH': 'Ethereum'
     };
     return names[symbol] || symbol;
   }
   
   async saveSnapshot(data) {
     try {
-      const { options, spotPrice, metrics, anomalies } = data;
+      const { options, spotPrice, metrics, anomalies, maxPain, sentiment } = data;
       
       if (!this.currentAssetId) {
         throw new Error('DataPersistence não inicializado. Chame initialize() primeiro.');
@@ -53,7 +62,9 @@ class DataPersistenceService {
       const snapshot = await this.db.transaction(async (t) => {
         // 1. Create market snapshot
         const MarketSnapshot = this.db.getModel('MarketSnapshot');
-        const snapshot = await MarketSnapshot.create({
+        
+        // Prepare snapshot data
+        const snapshotData = {
           assetId: this.currentAssetId,
           timestamp: Date.now(),
           spotPrice: spotPrice,
@@ -62,12 +73,38 @@ class DataPersistenceService {
           totalOpenInterest: this.calculateTotalOI(options),
           totalGex: metrics?.totalGEX?.total || 0,
           maxGexStrike: metrics?.maxGEXStrike || null,
-          regime: metrics?.regime || 'NEUTRAL' // Default to NEUTRAL if not provided
-        }, { transaction: t });
+          regime: metrics?.regime || null
+        };
+        
+        // Add Max Pain data if available
+        if (maxPain) {
+          snapshotData.maxPainStrike = maxPain.maxPainStrike || null;
+          snapshotData.maxPainOi = maxPain.maxPainOI || null;
+          snapshotData.maxPainCallOi = maxPain.maxPainCallOI || null;
+          snapshotData.maxPainPutOi = maxPain.maxPainPutOI || null;
+          
+          if (maxPain.analysis) {
+            snapshotData.maxPainDistance = maxPain.analysis.distance || null;
+            snapshotData.maxPainDistancePct = maxPain.analysis.distancePct || null;
+          }
+        }
+        
+        // Add Sentiment data if available
+        if (sentiment) {
+          snapshotData.putCallOiRatio = sentiment.putCallOIRatio || null;
+          snapshotData.putCallVolRatio = sentiment.putCallVolRatio || null;
+          snapshotData.sentiment = sentiment.sentiment || null;
+          snapshotData.totalCallOi = sentiment.totalCallOI || null;
+          snapshotData.totalPutOi = sentiment.totalPutOI || null;
+          snapshotData.totalCallVolume = sentiment.totalCallVolume || null;
+          snapshotData.totalPutVolume = sentiment.totalPutVolume || null;
+        }
+        
+        const snapshot = await MarketSnapshot.create(snapshotData, { transaction: t });
         
         // 2. Save options history
         if (options && options.length > 0) {
-          await this.saveOptionsHistory(snapshot.id, options, spotPrice, t);
+          await this.saveOptionsHistory(snapshot.id, options, t);
         }
         
         // 3. Save anomalies
@@ -87,87 +124,123 @@ class DataPersistenceService {
     }
   }
   
-  async saveOptionsHistory(snapshotId, options, spotPrice, transaction) {
+  async saveOptionsHistory(snapshotId, options, transaction) {
     const OptionsHistory = this.db.getModel('OptionsHistory');
+
+    // DEBUG: Ver primeiro item
+     this.logger.debug(`Tentando salvar ${options.length} options`);
+    if (options.length > 0) {
+      this.logger.debug('Primeira option:', JSON.stringify(options[0], null, 2));
+      this.logger.debug('Campos disponíveis:', Object.keys(options[0]));
+    }
     
     const records = options.map(opt => {
-      // Calculate DTE if not provided
-      const dte = opt.dte !== undefined
-         ? opt.dte
-         : Math.max(0, Math.ceil((opt.expiryDate - Date.now()) / (1000 * 60 * 60 * 24)));
+      // Garantir que expiryDate é um timestamp válido
+      let expiryTimestamp = opt.expiryDate;
       
-      // IMPORTANT: Use camelCase for fields that have field: 'snake_case' in the model
-      // Sequelize will automatically map camelCase -> snake_case based on model definition
+      // Se expiryDate for string, converter para timestamp
+      if (typeof expiryTimestamp === 'string') {
+        expiryTimestamp = new Date(expiryTimestamp).getTime();
+      }
+      
+      // Se ainda não for número, tentar parsear
+      if (typeof expiryTimestamp !== 'number' || isNaN(expiryTimestamp)) {
+        this.logger.warn(`Option ${opt.symbol} tem expiryDate inválida: ${opt.expiryDate}`);
+        expiryTimestamp = null;
+      }
+      
+      // Calcular DTE (Days to Expiration)
+      let dte = null;
+      if (expiryTimestamp) {
+        const now = Date.now();
+        const diffMs = expiryTimestamp - now;
+        dte = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+      }
+      
       return {
-        snapshotId: snapshotId,           // Maps to snapshot_id
-        assetId: this.currentAssetId,     // Maps to asset_id
+        snapshotId: snapshotId,
+        assetId: this.currentAssetId,
         symbol: opt.symbol,
+        type: opt.type,
+        side: opt.side,
         strike: opt.strike,
-        expiryDate: opt.expiryDate,       // Maps to expiry_date
+        expiryDate: expiryTimestamp,
         dte: dte,
-        side: opt.side || opt.type,
-        markPrice: opt.markPrice,         // Maps to mark_price
-        markIv: opt.markIV,               // Maps to mark_iv
-        underlyingPrice: spotPrice, // Maps to underlying_price
+        markPrice: opt.markPrice,
+        bidPrice: opt.bidPrice,
+        askPrice: opt.askPrice,
+        lastPrice: opt.lastPrice,
+        volume: opt.volume,
+        openInterest: opt.openInterest,
         delta: opt.delta,
         gamma: opt.gamma,
-        theta: opt.theta,
         vega: opt.vega,
-        volume: opt.volume || 0,          // Default to 0 if not provided
-        openInterest: opt.openInterest,   // Maps to open_interest
-        bidPrice: opt.bidPrice || null,   // Maps to bid_price
-        askPrice: opt.askPrice || null    // Maps to ask_price
+        theta: opt.theta,
+        markIv: opt.markIV
       };
     });
     
-    // Bulk insert for performance
-    await OptionsHistory.bulkCreate(records, { transaction });
+    // Bulk insert
+    await OptionsHistory.bulkCreate(records, { 
+      transaction,
+      validate: true
+    });
     
-    this.logger.debug(`${records.length} options salvos no histórico`);
+    this.logger.debug(`${records.length} options salvas no histórico`);
   }
   
   async saveAnomalies(snapshotId, anomalies, transaction) {
     const AnomaliesLog = this.db.getModel('AnomaliesLog');
     
-    const records = anomalies.map(a => ({
-      snapshotId: snapshotId,           // Maps to snapshot_id
-      assetId: this.currentAssetId,     // Maps to asset_id
-      anomalyType: a.type || a.anomalyType, // Maps to anomaly_type
-      severity: a.severity || 'MEDIUM',
-      strike: a.strike || null,
-      dte: a.dte || null,
-      moneyness: a.moneyness || null,
-      iv: a.iv || null,
-      callIv: a.callIV || null,         // Maps to call_iv
-      putIv: a.putIV || null,           // Maps to put_iv
-      expectedIv: a.expectedIV || null, // Maps to expected_iv
-      deviation: a.deviation || null,
-      deviationPct: a.deviationPct || null, // Maps to deviation_pct
-      zScore: a.zScore || null,         // Maps to z_score
-      spread: a.spread || null,
-      expectedSpread: a.expectedSpread || null, // Maps to expected_spread
-      priceType: a.priceType || null,   // Maps to price_type
-      skewType: a.skewType || null,     // Maps to skew_type
-      isWing: a.isWing || false,        // Maps to is_wing
-      relevanceScore: a.relevanceScore || null, // Maps to relevance_score
-      volume: a.volume || null,
-      openInterest: a.openInterest || null // Maps to open_interest
+    const records = anomalies.map(anomaly => ({
+      snapshotId: snapshotId,
+      assetId: this.currentAssetId,
+      anomalyType: anomaly.type,
+      severity: anomaly.severity,
+      strike: anomaly.strike,
+      dte: anomaly.dte,
+      moneyness: anomaly.moneyness,
+      iv: anomaly.iv || null,
+      callIv: anomaly.callIV || null,
+      putIv: anomaly.putIV || null,
+      expectedIv: anomaly.expectedIV || null,
+      deviation: anomaly.deviation || null,
+      deviationPct: anomaly.deviationPct || null,
+      zScore: anomaly.zScore,
+      spread: anomaly.spread || null,
+      expectedSpread: anomaly.expectedSpread || null,
+      priceType: anomaly.priceType || null,
+      skewType: anomaly.skewType || null,
+      isWing: anomaly.isWing || false,
+      relevanceScore: anomaly.relevanceScore || null,
+      volume: anomaly.volume || 0,
+      openInterest: anomaly.openInterest || 0,
+      // NEW FIELDS
+      oiVolumeRatio: anomaly.oiVolumeRatio || null,
+      spreadPct: anomaly.spreadPct || null,
+      bidPrice: anomaly.bidPrice || null,
+      askPrice: anomaly.askPrice || null
     }));
     
-    await AnomaliesLog.bulkCreate(records, { transaction });
+    await AnomaliesLog.bulkCreate(records, { 
+      transaction,
+      validate: true
+    });
     
-    this.logger.debug(`${records.length} anomalias salvas no log`);
+    this.logger.debug(`${records.length} anomalias salvas`);
   }
   
   calculateTotalVolume(options) {
-    return options.reduce((sum, opt) => sum + (parseFloat(opt.volume) || 0), 0);
+    return options.reduce((sum, opt) => sum + (opt.volume || 0), 0);
   }
   
   calculateTotalOI(options) {
-    return options.reduce((sum, opt) => sum + (parseFloat(opt.openInterest) || 0), 0);
+    return options.reduce((sum, opt) => sum + (opt.openInterest || 0), 0);
   }
   
-  // Query methods
+  /**
+   * Busca snapshots recentes
+   */
   async getRecentSnapshots(limit = 10) {
     const MarketSnapshot = this.db.getModel('MarketSnapshot');
     return await MarketSnapshot.findAll({
@@ -180,37 +253,26 @@ class DataPersistenceService {
   async getSnapshotById(snapshotId) {
     const MarketSnapshot = this.db.getModel('MarketSnapshot');
     return await MarketSnapshot.findByPk(snapshotId, {
-      include: [
-        { model: this.db.getModel('OptionsHistory'), as: 'options' },
-        { model: this.db.getModel('AnomaliesLog'), as: 'anomalies' }
-      ]
+      include: ['options', 'anomalies']
     });
   }
   
-  async getAnomaliesByTimeRange(startTime, endTime, severity = null) {
+  /**
+   * Busca anomalias recentes
+   */
+  async getRecentAnomalies(limit = 50) {
     const AnomaliesLog = this.db.getModel('AnomaliesLog');
     const MarketSnapshot = this.db.getModel('MarketSnapshot');
     
-    const where = {
-      assetId: this.currentAssetId
-    };
-    
-    if (severity) {
-      where.severity = severity;
-    }
-    
     return await AnomaliesLog.findAll({
-      where: where,
+      where: { assetId: this.currentAssetId },
       include: [{
         model: MarketSnapshot,
         as: 'snapshot',
-        where: {
-          timestamp: {
-            [this.db.sequelize.Sequelize.Op.between]: [startTime, endTime]
-          }
-        }
+        attributes: ['timestamp', 'spotPrice']
       }],
-      order: [['created_at', 'DESC']]
+      order: [['created_at', 'DESC']],
+      limit: limit
     });
   }
 }
