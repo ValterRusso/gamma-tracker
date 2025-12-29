@@ -430,6 +430,28 @@ calculateSmartRange(gammaProfile, spotPrice, wallZones, rangePercent = 0.3, gexT
   };
 }
 
+/**
+ * Encontra o strike com maior GEX (em valor absoluto)
+ * Este é o strike com maior impacto no mercado
+ * 
+ * @param {Array<Option>} options - Array de options
+ * @returns {number|null} - Strike com maior GEX absoluto
+ */
+findMaxGEXStrike(options) {
+  const profile = this.calculateGammaProfile(options);
+  
+  if (profile.length === 0) {
+    return null;
+  }
+  
+  // Encontrar strike com maior GEX em valor absoluto
+  const maxGEXItem = profile.reduce((max, current) => {
+    return Math.abs(current.totalGEX) > Math.abs(max.totalGEX) ? current : max;
+  }, profile[0]);
+  
+  return maxGEXItem.strike;
+}
+
 
 
   /**
@@ -444,6 +466,7 @@ calculateSmartRange(gammaProfile, spotPrice, wallZones, rangePercent = 0.3, gexT
     const gammaFlip = this.findGammaFlip(options);
     const putWall = this.findPutWall(options);
     const callWall = this.findCallWall(options);
+    const maxGEXStrike = this.findMaxGEXStrike(options);
     
     return {
       spotPrice: this.spotPrice,
@@ -452,6 +475,7 @@ calculateSmartRange(gammaProfile, spotPrice, wallZones, rangePercent = 0.3, gexT
       gammaFlip: gammaFlip,
       putWall: putWall,
       callWall: callWall,
+      maxGEXStrike: maxGEXStrike,
       timestamp: Date.now()
     };
   }
