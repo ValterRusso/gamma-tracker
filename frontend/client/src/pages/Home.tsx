@@ -5,6 +5,8 @@ import LoadingScreen from "@/components/LoadingScreen";
 import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, ReferenceArea } from "recharts";
 import axios from "axios";
+import MaxPainCard from "@/components/MaxPainCard";
+import SentimentCard from "@/components/SentimentCard";
 
 // Backend API URL
 const API_BASE_URL = "http://localhost:3300/api";
@@ -173,7 +175,7 @@ export default function Home() {
 
       <main className="container py-8 space-y-8">
         {/* Key Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* Total GEX */}
           <Card className="p-6 bg-card border-border">
             <div className="flex items-start justify-between mb-4">
@@ -303,7 +305,11 @@ export default function Home() {
                 </span>
               </div>
             </div>
-          </Card>
+          </Card>          
+          {/* Max Pain Card */}
+          <MaxPainCard />
+          {/* Sentiment Card */}
+          <SentimentCard />
         </div>
 
         {/* Gamma Profile Chart */}
