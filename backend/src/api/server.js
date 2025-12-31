@@ -1627,6 +1627,657 @@ this.app.get('/api/liquidations/cascade', async (req, res) => {
  * Ver LIQUIDATION_TRACKER_INTEGRATION.md
  * ============================================================================
  */
+ /**
+ * ============================================================================
+ * ORDER BOOK ANALYZER - API ENDPOINTS
+ * ============================================================================
+ * 
+ * Endpoints para acessar métricas do OrderBookAnalyzer.
+ * 
+ * ENDPOINTS:
+ * 1. GET /api/orderbook/metrics      - Todas as métricas
+ * 2. GET /api/orderbook/imbalance    - Book Imbalance detalhado
+ * 3. GET /api/orderbook/depth        - Análise de profundidade
+ * 4. GET /api/orderbook/spread       - Qualidade do spread
+ * 5. GET /api/orderbook/walls        - Walls detectadas
+ * 6. GET /api/orderbook/energy       - Energy Score
+ * 7. GET /api/orderbook/history      - Histórico completo
+ * 
+ * INTEGRAÇÃO:
+ * Adicionar no método setupRoutes() do seu server.js, após os endpoints
+ * de liquidações.
+ * 
+ * AUTOR: Gamma Tracker Team
+ * DATA: 2025-12-30
+ * ============================================================================
+ */
+
+// ============================================================================
+// ENDPOINT 1: GET /api/orderbook/metrics
+// ============================================================================
+
+/**
+ * Retorna TODAS as métricas do OrderBookAnalyzer.
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "BI": 0.45,
+ *     "BI_direction": "BULLISH",
+ *     "BI_strength": "MODERATE",
+ *     "BI_persistence": 0.75,
+ *     "BI_avg_60s": 0.42,
+ *     "totalBidVolume": 1250.5,
+ *     "totalAskVolume": 850.3,
+ *     "totalDepth": 2100.8,
+ *     "depthRatio": 1.47,
+ *     "depthChange": 0.12,
+ *     "bestBid": 95000.00,
+ *     "bestAsk": 95000.50,
+ *     "spread": 0.50,
+ *     "spread_pct": 0.0000053,
+ *     "spread_pulse": 0.0000012,
+ *     "bidWall": {
+ *       "price": 94500.00,
+ *       "size": 125.5,
+ *       "ratio": 15.2,
+ *       "distance": 0.53
+ *     },
+ *     "askWall": null,
+ *     "energyScore": 0.68,
+ *     "energyLevel": "MEDIUM",
+ *     "spotPrice": 95000.25,
+ *     "symbol": "btcusdt",
+ *     "lastUpdate": 1704047400000
+ *   },
+ *   "timestamp": "2025-12-30T21:30:00.000Z"
+ * }
+ * 
+ * INTERPRETAÇÃO:
+ * - BI = 0.45 (BULLISH MODERATE): Pressão de compra moderada
+ * - BI_persistence = 0.75: Fluxo sustentado (75% do tempo)
+ * - depthChange = 0.12: Liquidez 12% acima da média
+ * - energyScore = 0.68 (MEDIUM): Energia sustentada média
+ * - bidWall: Wall de compra em 94500 (0.53% abaixo do spot)
+ * 
+ * CASOS DE USO:
+ * - Dashboard principal
+ * - Monitoramento em tempo real
+ * - Análise completa do order book
+ */
+this.app.get('/api/orderbook/metrics', async (req, res) => {
+  try {
+    const metrics = this.dataCollector.getOrderBookMetrics();
+    
+    res.json({
+      success: true,
+      data: metrics,
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter orderbook metrics', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 2: GET /api/orderbook/imbalance
+// ============================================================================
+
+/**
+ * Retorna análise detalhada do Book Imbalance (BI).
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "BI": 0.45,
+ *     "direction": "BULLISH",
+ *     "strength": "MODERATE",
+ *     "persistence": 0.75,
+ *     "avg_60s": 0.42,
+ *     "interpretation": {
+ *       "message": "Pressão de compra MODERADA sustentada",
+ *       "confidence": "HIGH",
+ *       "recommendation": "Fluxo direcional confirmado"
+ *     }
+ *   },
+ *   "timestamp": "2025-12-30T21:30:00.000Z"
+ * }
+ * 
+ * INTERPRETAÇÃO:
+ * - BI > 0.6: Pressão de compra FORTE
+ * - BI > 0.3: Pressão de compra MODERADA
+ * - BI ≈ 0: NEUTRO
+ * - BI < -0.3: Pressão de venda MODERADA
+ * - BI < -0.6: Pressão de venda FORTE
+ * 
+ * - persistence > 0.8: Fluxo MUITO sustentado (H1)
+ * - persistence > 0.5: Fluxo sustentado
+ * - persistence < 0.3: Oscilando (H2)
+ * 
+ * CASOS DE USO:
+ * - Detectar pressão direcional
+ * - Confirmar hipótese H1 (escape bom)
+ * - Identificar H2 (falso escape)
+ * - Entrada/saída de trades
+ */
+this.app.get('/api/orderbook/imbalance', async (req, res) => {
+  try {
+    const imbalance = this.dataCollector.getOrderBookImbalance();
+    
+    // Adicionar interpretação
+    let interpretation = {
+      message: '',
+      confidence: 'LOW',
+      recommendation: ''
+    };
+    
+    if (Math.abs(imbalance.BI) > 0.6) {
+      interpretation.message = `Pressão de ${imbalance.direction === 'BULLISH' ? 'compra' : 'venda'} FORTE`;
+      interpretation.confidence = 'HIGH';
+    } else if (Math.abs(imbalance.BI) > 0.3) {
+      interpretation.message = `Pressão de ${imbalance.direction === 'BULLISH' ? 'compra' : 'venda'} MODERADA`;
+      interpretation.confidence = 'MEDIUM';
+    } else {
+      interpretation.message = 'Mercado NEUTRO';
+      interpretation.confidence = 'LOW';
+    }
+    
+    if (imbalance.persistence > 0.8) {
+      interpretation.recommendation = 'Fluxo direcional MUITO sustentado (H1)';
+    } else if (imbalance.persistence > 0.5) {
+      interpretation.recommendation = 'Fluxo direcional sustentado';
+    } else if (imbalance.persistence < 0.3) {
+      interpretation.recommendation = 'Fluxo oscilando - possível H2';
+    } else {
+      interpretation.recommendation = 'Fluxo moderado';
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        ...imbalance,
+        interpretation
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter orderbook imbalance', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 3: GET /api/orderbook/depth
+// ============================================================================
+
+/**
+ * Retorna análise de profundidade do order book.
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "totalDepth": 2100.8,
+ *     "bidVolume": 1250.5,
+ *     "askVolume": 850.3,
+ *     "ratio": 1.47,
+ *     "change": 0.12,
+ *     "interpretation": {
+ *       "liquidityLevel": "HIGH",
+ *       "message": "Liquidez 12% acima da média",
+ *       "risk": "LOW"
+ *     }
+ *   },
+ *   "timestamp": "2025-12-30T21:30:00.000Z"
+ * }
+ * 
+ * INTERPRETAÇÃO:
+ * - change > 0.3: Liquidez aumentando (bom)
+ * - change > 0: Liquidez acima da média
+ * - change < -0.3: Liquidez secando (H3 - colapso)
+ * - change < -0.5: Liquidez MUITO baixa (risco alto)
+ * 
+ * - ratio > 1.5: Muito mais bids (suporte forte)
+ * - ratio < 0.67: Muito mais asks (resistência forte)
+ * 
+ * CASOS DE USO:
+ * - Detectar H3 (colapso de liquidez)
+ * - Avaliar risco de slippage
+ * - Identificar suporte/resistência
+ */
+this.app.get('/api/orderbook/depth', async (req, res) => {
+  try {
+    const depth = this.dataCollector.getOrderBookDepth();
+    
+    // Adicionar interpretação
+    let interpretation = {
+      liquidityLevel: 'MEDIUM',
+      message: '',
+      risk: 'MEDIUM'
+    };
+    
+    if (depth.change < -0.5) {
+      interpretation.liquidityLevel = 'VERY_LOW';
+      interpretation.message = `Liquidez MUITO baixa (${(depth.change * 100).toFixed(1)}% abaixo da média)`;
+      interpretation.risk = 'VERY_HIGH';
+    } else if (depth.change < -0.3) {
+      interpretation.liquidityLevel = 'LOW';
+      interpretation.message = `Liquidez secando (${(depth.change * 100).toFixed(1)}% abaixo da média) - possível H3`;
+      interpretation.risk = 'HIGH';
+    } else if (depth.change > 0.3) {
+      interpretation.liquidityLevel = 'HIGH';
+      interpretation.message = `Liquidez alta (${(depth.change * 100).toFixed(1)}% acima da média)`;
+      interpretation.risk = 'LOW';
+    } else if (depth.change > 0) {
+      interpretation.liquidityLevel = 'MEDIUM';
+      interpretation.message = `Liquidez acima da média (${(depth.change * 100).toFixed(1)}%)`;
+      interpretation.risk = 'LOW';
+    } else {
+      interpretation.liquidityLevel = 'MEDIUM';
+      interpretation.message = `Liquidez abaixo da média (${(depth.change * 100).toFixed(1)}%)`;
+      interpretation.risk = 'MEDIUM';
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        ...depth,
+        interpretation
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter orderbook depth', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 4: GET /api/orderbook/spread
+// ============================================================================
+
+/**
+ * Retorna análise de qualidade do spread.
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "spread": 0.50,
+ *     "spread_pct": 0.0000053,
+ *     "pulse": 0.0000012,
+ *     "bestBid": 95000.00,
+ *     "bestAsk": 95000.50,
+ *     "interpretation": {
+ *       "quality": "EXCELLENT",
+ *       "message": "Spread muito apertado (0.0005%)",
+ *       "volatility": "LOW"
+ *     }
+ *   },
+ *   "timestamp": "2025-12-30T21:30:00.000Z"
+ * }
+ * 
+ * INTERPRETAÇÃO:
+ * - spread_pct < 0.01%: EXCELLENT (muito líquido)
+ * - spread_pct < 0.05%: GOOD
+ * - spread_pct < 0.1%: FAIR
+ * - spread_pct > 0.1%: POOR (ilíquido)
+ * 
+ * - pulse baixo: Mercado calmo
+ * - pulse alto: Mercado nervoso/volátil
+ * 
+ * CASOS DE USO:
+ * - Avaliar qualidade de execução
+ * - Detectar nervosismo do mercado
+ * - Timing de entrada/saída
+ */
+this.app.get('/api/orderbook/spread', async (req, res) => {
+  try {
+    const spread = this.dataCollector.getOrderBookSpread();
+    
+    // Adicionar interpretação
+    let interpretation = {
+      quality: 'FAIR',
+      message: '',
+      volatility: 'MEDIUM'
+    };
+    
+    const spread_bps = spread.spread_pct * 10000;  // basis points
+    
+    if (spread_bps < 1) {
+      interpretation.quality = 'EXCELLENT';
+      interpretation.message = `Spread muito apertado (${spread_bps.toFixed(2)} bps)`;
+    } else if (spread_bps < 5) {
+      interpretation.quality = 'GOOD';
+      interpretation.message = `Spread bom (${spread_bps.toFixed(2)} bps)`;
+    } else if (spread_bps < 10) {
+      interpretation.quality = 'FAIR';
+      interpretation.message = `Spread razoável (${spread_bps.toFixed(2)} bps)`;
+    } else {
+      interpretation.quality = 'POOR';
+      interpretation.message = `Spread largo (${spread_bps.toFixed(2)} bps) - baixa liquidez`;
+    }
+    
+    if (spread.pulse < 0.00001) {
+      interpretation.volatility = 'LOW';
+    } else if (spread.pulse < 0.00005) {
+      interpretation.volatility = 'MEDIUM';
+    } else {
+      interpretation.volatility = 'HIGH';
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        ...spread,
+        interpretation
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter orderbook spread', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 5: GET /api/orderbook/walls
+// ============================================================================
+
+/**
+ * Retorna walls detectadas no order book.
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "bidWall": {
+ *       "price": 94500.00,
+ *       "size": 125.5,
+ *       "ratio": 15.2,
+ *       "distance": 0.53,
+ *       "type": "SUPPORT",
+ *       "strength": "STRONG"
+ *     },
+ *     "askWall": null,
+ *     "interpretation": {
+ *       "message": "Wall de suporte forte em 94500",
+ *       "significance": "HIGH"
+ *     }
+ *   },
+ *   "timestamp": "2025-12-30T21:30:00.000Z"
+ * }
+ * 
+ * INTERPRETAÇÃO:
+ * - bidWall: Suporte (compra grande)
+ * - askWall: Resistência (venda grande)
+ * 
+ * - ratio > 20: Wall MUITO forte
+ * - ratio > 10: Wall forte
+ * - ratio < 10: Não é wall significativa
+ * 
+ * - distance < 1%: Wall próxima (importante)
+ * - distance > 5%: Wall distante (menos relevante)
+ * 
+ * CASOS DE USO:
+ * - Identificar suporte/resistência
+ * - Detectar manipulação (spoofing)
+ * - Níveis de stop loss/take profit
+ */
+this.app.get('/api/orderbook/walls', async (req, res) => {
+  try {
+    const walls = this.dataCollector.getOrderBookWalls();
+    
+    // Adicionar interpretação
+    let interpretation = {
+      message: '',
+      significance: 'LOW'
+    };
+    
+    if (walls.bidWall && walls.askWall) {
+      interpretation.message = `Walls em ambos os lados: suporte em ${walls.bidWall.price.toFixed(2)} e resistência em ${walls.askWall.price.toFixed(2)}`;
+      interpretation.significance = 'VERY_HIGH';
+    } else if (walls.bidWall) {
+      const strength = walls.bidWall.ratio > 20 ? 'MUITO forte' : 'forte';
+      interpretation.message = `Wall de suporte ${strength} em ${walls.bidWall.price.toFixed(2)} (${walls.bidWall.distance.toFixed(2)}% abaixo)`;
+      interpretation.significance = walls.bidWall.ratio > 20 ? 'VERY_HIGH' : 'HIGH';
+      
+      // Adicionar tipo e força
+      walls.bidWall.type = 'SUPPORT';
+      walls.bidWall.strength = walls.bidWall.ratio > 20 ? 'VERY_STRONG' : 'STRONG';
+    } else if (walls.askWall) {
+      const strength = walls.askWall.ratio > 20 ? 'MUITO forte' : 'forte';
+      interpretation.message = `Wall de resistência ${strength} em ${walls.askWall.price.toFixed(2)} (${walls.askWall.distance.toFixed(2)}% acima)`;
+      interpretation.significance = walls.askWall.ratio > 20 ? 'VERY_HIGH' : 'HIGH';
+      
+      // Adicionar tipo e força
+      walls.askWall.type = 'RESISTANCE';
+      walls.askWall.strength = walls.askWall.ratio > 20 ? 'VERY_STRONG' : 'STRONG';
+    } else {
+      interpretation.message = 'Nenhuma wall significativa detectada';
+      interpretation.significance = 'LOW';
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        ...walls,
+        interpretation
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter orderbook walls', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 6: GET /api/orderbook/energy
+// ============================================================================
+
+/**
+ * Retorna Energy Score do order book para o Half Pipe Model.
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "score": 0.68,
+ *     "level": "MEDIUM",
+ *     "components": {
+ *       "BI": 0.45,
+ *       "persistence": 0.75,
+ *       "spread_quality": 0.95,
+ *       "depth": 1.12
+ *     },
+ *     "interpretation": {
+ *       "message": "Energia sustentada MÉDIA",
+ *       "recommendation": "Fluxo presente mas não dominante"
+ *     }
+ *   },
+ *   "timestamp": "2025-12-30T21:30:00.000Z"
+ * }
+ * 
+ * INTERPRETAÇÃO:
+ * - score > 0.7 (HIGH): Energia forte e sustentada
+ * - score > 0.4 (MEDIUM): Energia moderada
+ * - score < 0.4 (LOW): Energia fraca
+ * 
+ * COMPONENTES:
+ * - BI (40%): Magnitude do imbalance
+ * - persistence (30%): Sustentação do fluxo
+ * - spread_quality (20%): Qualidade do spread
+ * - depth (10%): Profundidade relativa
+ * 
+ * RELAÇÃO COM HALF PIPE:
+ * - Energy Score = "energia sustentada" do fluxo
+ * - Combinar com LiquidationTracker (energia injetada)
+ * - Comparar com GEX (potencial)
+ * - P_escape = (Energy_sustained + Energy_injected) / Potential
+ * 
+ * CASOS DE USO:
+ * - Half Pipe Model
+ * - Detectar H1 vs H2 vs H3
+ * - Calcular P_escape
+ */
+this.app.get('/api/orderbook/energy', async (req, res) => {
+  try {
+    const energy = this.dataCollector.getOrderBookEnergy();
+    
+    // Adicionar interpretação
+    let interpretation = {
+      message: '',
+      recommendation: ''
+    };
+    
+    if (energy.level === 'HIGH') {
+      interpretation.message = 'Energia sustentada ALTA';
+      interpretation.recommendation = 'Fluxo forte e persistente - favorece H1';
+    } else if (energy.level === 'MEDIUM') {
+      interpretation.message = 'Energia sustentada MÉDIA';
+      interpretation.recommendation = 'Fluxo presente mas não dominante';
+    } else {
+      interpretation.message = 'Energia sustentada BAIXA';
+      interpretation.recommendation = 'Fluxo fraco - possível H2 ou mercado preso';
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        ...energy,
+        interpretation
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter orderbook energy', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 7: GET /api/orderbook/history
+// ============================================================================
+
+/**
+ * Retorna histórico completo (últimos 60s) de todas as métricas.
+ * 
+ * QUERY PARAMS:
+ * - window: Janela de tempo em segundos (default: 60, max: 60)
+ * 
+ * RESPOSTA:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "BI_history": [
+ *       { "time": 1704047340000, "BI": 0.42, "direction": "BULLISH" },
+ *       { "time": 1704047340100, "BI": 0.43, "direction": "BULLISH" },
+ *       ...
+ *     ],
+ *     "depth_history": [
+ *       { "time": 1704047340000, "totalDepth": 2050.5, "bidVolume": 1200.3, "askVolume": 850.2 },
+ *       ...
+ *     ],
+ *     "spread_history": [
+ *       { "time": 1704047340000, "spread": 0.50, "spread_pct": 0.0000053 },
+ *       ...
+ *     ],
+ *     "stats": {
+ *       "dataPoints": 600,
+ *       "window": 60,
+ *       "avgBI": 0.42,
+ *       "avgDepth": 2100.5,
+ *       "avgSpread": 0.52
+ *     }
+ *   },
+ *   "timestamp": "2025-12-30T21:30:00.000Z"
+ * }
+ * 
+ * CASOS DE USO:
+ * - Gráficos de evolução temporal
+ * - Análise de tendências
+ * - Backtesting
+ * - Visualização de persistência
+ */
+this.app.get('/api/orderbook/history', async (req, res) => {
+  try {
+    const window = Math.min(parseInt(req.query.window) || 60, 60);
+    const history = this.dataCollector.getOrderBookHistory();
+    
+    // Filtrar por janela de tempo
+    const cutoff = Date.now() - (window * 1000);
+    const filtered = {
+      BI_history: history.BI_history.filter(h => h.time > cutoff),
+      depth_history: history.depth_history.filter(h => h.time > cutoff),
+      spread_history: history.spread_history.filter(h => h.time > cutoff)
+    };
+    
+    // Calcular estatísticas
+    const stats = {
+      dataPoints: filtered.BI_history.length,
+      window: window,
+      avgBI: filtered.BI_history.length > 0 
+        ? filtered.BI_history.reduce((sum, h) => sum + h.BI, 0) / filtered.BI_history.length 
+        : 0,
+      avgDepth: filtered.depth_history.length > 0
+        ? filtered.depth_history.reduce((sum, h) => sum + h.totalDepth, 0) / filtered.depth_history.length
+        : 0,
+      avgSpread: filtered.spread_history.length > 0
+        ? filtered.spread_history.reduce((sum, h) => sum + h.spread, 0) / filtered.spread_history.length
+        : 0
+    };
+    
+    res.json({
+      success: true,
+      data: {
+        ...filtered,
+        stats
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter orderbook history', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+ 
 
 
 
