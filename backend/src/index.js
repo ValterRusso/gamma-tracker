@@ -314,6 +314,9 @@ class GammaTracker {
     console.log(`   wall-zones: http://localhost:${this.config.apiPort}/api/wall-zones`);
     console.log(`   Vol Surface: http://localhost:${this.config.apiPort}/api/vol-surface`);
     console.log(`   Anomalias: http://localhost:${this.config.apiPort}/api/vol-anomalies`);
+    console.log(`   Max Pain: http://localhost:${this.config.apiPort}/api/max-pain`);
+    console.log(`   Sentimento: http://localhost:${this.config.apiPort}/api/sentiment`);  
+
     
     console.log('\n' + '='.repeat(70));
     console.log('Sistema rodando. Pressione Ctrl+C para sair.\n');
