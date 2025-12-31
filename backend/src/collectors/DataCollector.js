@@ -13,6 +13,7 @@ const Option = require('../models/Option');
 const SpotPriceCollector = require('./SpotPriceCollector');
 const OpenInterestCollector = require('./OpenInterestCollector');
 const LiquidationTracker = require('./LiquidationTracker');
+const OrderBookAnalyzer = require('./OrderBookAnalyzer')
 
 class DataCollector extends EventEmitter {
   constructor(config = {}) {
@@ -49,6 +50,9 @@ class DataCollector extends EventEmitter {
     
     // Liquidation Tracker
     this.liquidationTracker = null;
+
+    // Order Book Analyzer (futuros)
+    this.OrderBookAnalyzer = null;
   }
 
   /**
@@ -132,6 +136,26 @@ class DataCollector extends EventEmitter {
       
       this.liquidationTracker.connect();
       this.logger.success('LiquidationTracker iniciado');
+
+      // 10. Inicializar e conectar OrderBookAnalyzer (futuros)
+      this.orderBookAnalyzer = new OrderBookAnalyzer(
+        `${this.config.underlying.toLowerCase()}usdt`,
+        this.logger
+      );
+      this.orderBookAnalyzer.on('connected', () => {
+        this.logger.success('✅ OrderBookAnalyzer conectado');
+        this.emit('orderbook-analyzer-connected');
+      });
+      this.orderBookAnalyzer.on('update', (metrics) => {
+        // Emitir evento para quem quiser processar as métricas do order book
+        this.emit('orderbook-analyzer-update', metrics);
+      });
+      this.orderBookAnalyzer.on('error', (error) => {
+        this.logger.error('❌ OrderBookAnalyzer error:', error);
+        this.emit('orderbook-analyzer-error', error);
+      });
+      this.orderBookAnalyzer.connect();
+      this.logger.success('OrderBookAnalyzer iniciado');
       
       this.logger.success('DataCollector iniciado com sucesso');
       this.emit('ready');
@@ -168,6 +192,11 @@ class DataCollector extends EventEmitter {
     if (this.liquidationTracker) {
       this.liquidationTracker.disconnect();
       this.liquidationTracker = null;
+    }
+    // Parar OrderBookAnalyzer (futuros)
+    if (this.orderBookAnalyzer) {
+      this.orderBookAnalyzer.disconnect();
+      this.orderBookAnalyzer = null;
     }
     
     // Fechar WebSockets
@@ -517,6 +546,58 @@ class DataCollector extends EventEmitter {
     }
     return this.liquidationTracker.getEnergyScore();
   }
+  /**
+ * Obter métricas do OrderBookAnalyzer
+ */
+  getOrderBookMetrics() {
+    if (!this.orderBookAnalyzer) {
+      throw new Error('OrderBookAnalyzer não inicializado');
+    }
+    return this.orderBookAnalyzer.getMetrics();
+  }
+
+  getOrderBookImbalance() {
+    if (!this.orderBookAnalyzer) {
+      throw new Error('OrderBookAnalyzer não inicializado');
+    }
+    return this.orderBookAnalyzer.getBookImbalance();
+  }
+
+  getOrderBookDepth() {
+    if (!this.orderBookAnalyzer) {
+      throw new Error('OrderBookAnalyzer não inicializado');
+    }
+    return this.orderBookAnalyzer.getDepth();
+  }
+
+  getOrderBookSpread() {
+    if (!this.orderBookAnalyzer) {
+      throw new Error('OrderBookAnalyzer não inicializado');
+    }
+    return this.orderBookAnalyzer.getSpreadQuality();
+  }
+
+  getOrderBookWalls() {
+    if (!this.orderBookAnalyzer) {
+      throw new Error('OrderBookAnalyzer não inicializado');
+    }
+    return this.orderBookAnalyzer.getWalls();
+  }
+
+  getOrderBookEnergy() {
+    if (!this.orderBookAnalyzer) {
+      throw new Error('OrderBookAnalyzer não inicializado');
+    }
+    return this.orderBookAnalyzer.getEnergyScore();
+  }
+
+  getOrderBookHistory() {
+    if (!this.orderBookAnalyzer) {
+      throw new Error('OrderBookAnalyzer não inicializado');
+    }
+    return this.orderBookAnalyzer.getHistory();
+  }
+
 
   /**
    * Obtém estatísticas do coletor
@@ -542,8 +623,15 @@ class DataCollector extends EventEmitter {
       stats.liquidationEnergy = this.liquidationTracker.getEnergyScore();
     }
     
+    if (this.orderBookAnalyzer) {
+      stats.orderBookAnalyzerConnected = this.orderBookAnalyzer.connected;
+      stats.orderBookEnergy = this.orderBookAnalyzer.getEnergyScore();
+    }
+    
     return stats;
   }
+  
+
 }
 
 module.exports = DataCollector;
