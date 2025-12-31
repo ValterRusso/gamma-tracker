@@ -12,6 +12,7 @@ const Logger = require('../utils/logger');
 const Option = require('../models/Option');
 const SpotPriceCollector = require('./SpotPriceCollector');
 const OpenInterestCollector = require('./OpenInterestCollector');
+const LiquidationTracker = require('./LiquidationTracker');
 
 class DataCollector extends EventEmitter {
   constructor(config = {}) {
@@ -45,6 +46,9 @@ class DataCollector extends EventEmitter {
     
     // Open Interest
     this.openInterestCollector = null;
+    
+    // Liquidation Tracker
+    this.liquidationTracker = null;
   }
 
   /**
@@ -100,6 +104,35 @@ class DataCollector extends EventEmitter {
       await this.openInterestCollector.start(expiries);
       this.logger.success('Coletor de Open Interest iniciado');
       
+      // 9. Inicializar e conectar LiquidationTracker
+      this.liquidationTracker = new LiquidationTracker(
+        `${this.config.underlying.toLowerCase()}usdt`,
+        this.logger
+      );
+      
+      this.liquidationTracker.on('connected', () => {
+        this.logger.success('✅ LiquidationTracker conectado');
+        this.emit('liquidation-tracker-connected');
+      });
+      
+      this.liquidationTracker.on('liquidation', (liq) => {
+        // Emitir evento para quem quiser processar cada liquidação
+        this.emit('liquidation', liq);
+      });
+      
+      this.liquidationTracker.on('cascade', (stats) => {
+        this.logger.warn('🚨 CASCATA DE LIQUIDAÇÕES DETECTADA!', stats);
+        this.emit('liquidation-cascade', stats);
+      });
+      
+      this.liquidationTracker.on('error', (error) => {
+        this.logger.error('❌ LiquidationTracker error:', error);
+        this.emit('liquidation-tracker-error', error);
+      });
+      
+      this.liquidationTracker.connect();
+      this.logger.success('LiquidationTracker iniciado');
+      
       this.logger.success('DataCollector iniciado com sucesso');
       this.emit('ready');
       
@@ -129,6 +162,12 @@ class DataCollector extends EventEmitter {
     // Parar coletor de Open Interest
     if (this.openInterestCollector) {
       this.openInterestCollector.stop();
+    }
+    
+    // Parar LiquidationTracker
+    if (this.liquidationTracker) {
+      this.liquidationTracker.disconnect();
+      this.liquidationTracker = null;
     }
     
     // Fechar WebSockets
@@ -460,13 +499,33 @@ class DataCollector extends EventEmitter {
   }
 
   /**
+   * Obtém estatísticas de liquidações
+   */
+  getLiquidationStats() {
+    if (!this.liquidationTracker) {
+      return null;
+    }
+    return this.liquidationTracker.getStats();
+  }
+
+  /**
+   * Obtém energy score das liquidações
+   */
+  getLiquidationEnergy() {
+    if (!this.liquidationTracker) {
+      return null;
+    }
+    return this.liquidationTracker.getEnergyScore();
+  }
+
+  /**
    * Obtém estatísticas do coletor
    */
   getStats() {
     const allOptions = this.getAllOptions();
     const validOptions = allOptions.filter(opt => opt.gamma > 0);
     
-    return {
+    const stats = {
       totalOptions: allOptions.length,
       validOptions: validOptions.length,
       wsMarkPriceConnected: this.wsMarkPriceConnected,
@@ -476,6 +535,14 @@ class DataCollector extends EventEmitter {
       uniqueStrikes: this.getUniqueStrikes().length,
       uniqueExpiries: this.getUniqueExpiries().length
     };
+    
+    // Adicionar stats de liquidações se disponível
+    if (this.liquidationTracker) {
+      stats.liquidationTrackerConnected = this.liquidationTracker.connected;
+      stats.liquidationEnergy = this.liquidationTracker.getEnergyScore();
+    }
+    
+    return stats;
   }
 }
 
