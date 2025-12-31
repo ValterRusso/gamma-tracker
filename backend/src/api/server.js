@@ -1,6 +1,68 @@
 /**
- * API Server - Express server para expor dados do Gamma Tracker
+ * ============================================================================
+ * GAMMA TRACKER - API SERVER
+ * ============================================================================
+ * 
+ * Express API server para expor dados do Gamma Tracker em tempo real.
+ * 
+ * COMPONENTES PRINCIPAIS:
+ * - DataCollector: Coleta dados de options da Binance
+ * - GEXCalculator: Calcula Gamma Exposure
+ * - RegimeAnalyzer: Analisa regime de mercado
+ * - VolatilitySurfaceCalculator: Constrói superfície de volatilidade
+ * - MaxPainCalculator: Calcula Max Pain
+ * - SentimentAnalyzer: Analisa sentimento Put/Call
+ * - StrategyRecommender: Recomenda estratégias de options
+ * - LiquidationTracker: Rastreia liquidações forçadas (Binance Futures)
+ * 
+ * ENDPOINTS DISPONÍVEIS:
+ * 
+ * SISTEMA:
+ * - GET /health                           - Health check
+ * - GET /api/status                       - Status do coletor
+ * 
+ * MÉTRICAS:
+ * - GET /api/metrics                      - Métricas completas (cached)
+ * - GET /api/gamma-profile                - Perfil de gamma por strike
+ * - GET /api/total-gex                    - GEX total
+ * - GET /api/gamma-flip                   - Gamma flip level
+ * - GET /api/walls                        - Put/Call walls
+ * - GET /api/wall-zones                   - Zonas de suporte/resistência
+ * 
+ * VOLATILIDADE:
+ * - GET /api/vol-surface                  - Superfície de volatilidade 3D
+ * - GET /api/vol-skew                     - Volatility skew 2D
+ * - GET /api/anomalies                    - Anomalias de volatilidade
+ * 
+ * MAX PAIN & SENTIMENT:
+ * - GET /api/max-pain                     - Max Pain strike
+ * - GET /api/sentiment                    - Análise de sentimento
+ * 
+ * ESTRATÉGIAS:
+ * - GET /api/strategies/recommend         - Recomendações (top N)
+ * - GET /api/strategies/all               - Todas as estratégias com scores
+ * - GET /api/strategies/:id               - Estratégia específica
+ * 
+ * LIQUIDAÇÕES (NOVO):
+ * - GET /api/liquidations/stats           - Estatísticas gerais
+ * - GET /api/liquidations/energy          - Energy score (Half Pipe)
+ * - GET /api/liquidations/summary         - Resumo completo
+ * - GET /api/liquidations/recent          - Liquidações recentes
+ * - GET /api/liquidations/early           - Early spike detection (H2)
+ * - GET /api/liquidations/growth          - Taxa de crescimento (H1)
+ * - GET /api/liquidations/cascade         - Detecção de cascata
+ * 
+ * HISTÓRICO (DATABASE):
+ * - GET /api/market-history               - Histórico de snapshots
+ * - GET /api/regime-history               - Histórico de regimes
+ * 
+ * PORTA: 3300 (padrão)
+ * CORS: Habilitado
+ * CACHE: Métricas com TTL de 5 segundos
+ * 
+ * ============================================================================
  */
+
 
 const express = require('express');
 const cors = require('cors');
@@ -62,7 +124,9 @@ class APIServer {
    * Configura rotas da API
    */
   setupRoutes() {
-    // Health check
+  // ========================================
+  // SISTEMA - health, status
+  // ========================================    
     this.app.get('/health', (req, res) => {
       res.json({
         status: 'OK',
@@ -88,6 +152,9 @@ class APIServer {
       }
     });
 
+    // ========================================
+    // MÉTRICAS
+    // ========================================
     // Métricas completas (com cache)
     this.app.get('/api/metrics', async (req, res) => {
       try {
@@ -516,6 +583,10 @@ class APIServer {
       }
     });
 
+    // ========================================
+    // MAX PAIN & SENTIMENT
+    // ========================================
+
     // Max Pain endpoint
     this.app.get('/api/max-pain', async (req, res) => {
       try {
@@ -687,12 +758,12 @@ class APIServer {
         });
       }
     });
-    // Endpoint de teste SUPER simples
-    this.app.get('/api/test', (req, res) => {
-      res.json({ message: 'Funcionou!' });
-    });
 
-    // Endpoint 1: Recomendações (Top 3-5)
+    // ========================================
+    // ESTRATÉGIAS
+    // ========================================
+
+    // Endpoint: Recomendações (Top 3-5)
     this.app.get('/api/strategies/recommend', async (req, res) => {
       try {
         // Buscar modelo do banco de dados
@@ -833,7 +904,7 @@ class APIServer {
       }
     });
 
-    // Endpoint 3: Detalhes de uma estratégia específica
+    // Endpoint: Detalhes de uma estratégia específica
     this.app.get('/api/strategies/:id', async (req, res) => {
       try {
         const strategyId = req.params.id;
@@ -960,118 +1031,603 @@ class APIServer {
         });
       }
     });
+    
+    /**
+ * ============================================================================
+ * LIQUIDATION ENDPOINTS - Gamma Tracker
+ * ============================================================================
+ * 
+ * Este módulo contém todos os endpoints relacionados ao rastreamento de
+ * liquidações forçadas da Binance Futures.
+ * 
+ * DEPENDÊNCIAS:
+ * - LiquidationTracker integrado no DataCollector
+ * - DataCollector deve estar inicializado e conectado
+ * 
+ * ENDPOINTS DISPONÍVEIS:
+ * 1. GET /api/liquidations/stats          - Estatísticas gerais de liquidações
+ * 2. GET /api/liquidations/energy         - Energy score (Half Pipe Model)
+ * 3. GET /api/liquidations/summary        - Resumo completo
+ * 4. GET /api/liquidations/recent         - Liquidações recentes (filtro por tempo)
+ * 5. GET /api/liquidations/early          - Early spike detection (H2 - Falso Escape)
+ * 6. GET /api/liquidations/growth         - Taxa de crescimento (H1 - Escape Bom)
+ * 7. GET /api/liquidations/cascade        - Detecção de cascata
+ * 
+ * COMO INTEGRAR NO server.js:
+ * 1. Adicionar este bloco completo dentro do método setupRoutes()
+ * 2. Posicionar após os endpoints existentes
+ * 3. Antes do fechamento do método setupRoutes()
+ * 
+ * EXEMPLO DE LOCALIZAÇÃO:
+ * ```javascript
+ * setupRoutes() {
+ *   // ... endpoints existentes ...
+ *   
+ *   // ========================================
+ *   // LIQUIDATION ENDPOINTS
+ *   // ========================================
+ *   // [ADICIONAR AQUI]
+ *   
+ * } // fim de setupRoutes()
+ * ```
+ * ============================================================================
+ */
 
-    // ========================================
-// ENDPOINT DE DEBUG - TEMPORÁRIO
-// ========================================
-    this.app.get('/api/debug/anomalies', async (req, res) => {
-      try {
-        const AnomaliesLog = this.db.getModel('AnomaliesLog');
-        const MarketSnapshot = this.db.getModel('MarketSnapshot');
-        
-        const debug = {
-          step1_database_check: null,
-          step2_raw_query: null,
-          step3_with_filter: null,
-          step4_analyzer_input: null,
-          step5_analyzer_output: null,
-          step6_final_result: null
-        };
-        
-        // STEP 1: Verificar se o modelo existe
-        debug.step1_database_check = {
-          model_exists: !!AnomaliesLog,
-          model_name: AnomaliesLog ? AnomaliesLog.name : 'undefined'
-        };
-        
-        // STEP 2: Query mais simples possível (últimos 5 registros)
-        const allAnomalies = await AnomaliesLog.findAll({
-          raw: true,
-          limit: 5,
-          order: [['created_at', 'DESC']]
-        });
-        
-        debug.step2_raw_query = {
-          count: allAnomalies.length,
-          first_record: allAnomalies[0] || null,
-          all_records: allAnomalies
-        };
-        
-        // STEP 3: Com filtro de 24 horas
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const filteredAnomalies = await AnomaliesLog.findAll({
-          where: {
-            created_at: {
-              [Op.gte]: oneDayAgo
-            }
-          },
-          raw: true,
-          limit: 5,
-          order: [['created_at', 'DESC']]
-        });
-        
-        debug.step3_with_filter = {
-          oneDayAgo: oneDayAgo.toISOString(),
-          now: new Date().toISOString(),
-          count: filteredAnomalies.length,
-          first_record: filteredAnomalies[0] || null
-        };
-        
-        // STEP 4: Testar MarketStateAnalyzer
-        const latestSnapshot = await MarketSnapshot.findOne({
-          order: [['created_at', 'DESC']]
-        });
-        
-        if (latestSnapshot) {
-          const MarketStateAnalyzer = require('../recommender/MarketStateAnalyzer');
-          
-          debug.step4_analyzer_input = {
-            snapshot_exists: true,
-            anomalies_count: allAnomalies.length,
-            anomalies_sample: allAnomalies.slice(0, 2)
-          };
-          
-          const analyzer = new MarketStateAnalyzer(
-            latestSnapshot.toJSON(),
-            [],
-            allAnomalies
-          );
-          
-          debug.step5_analyzer_output = {
-            anomalies_in_constructor: analyzer.anomalies.length,
-            anomalies_sample: analyzer.anomalies.slice(0, 2)
-          };
-          
-          const marketState = analyzer.analyze();
-          
-          debug.step6_final_result = {
-            anomalies_in_marketState: marketState.anomalies.length,
-            anomalies_values: marketState.anomalies
-          };
-        } else {
-          debug.step4_analyzer_input = { error: 'No snapshot found' };
-        }
-        
-        res.json({
-          success: true,
-          debug: debug,
-          conclusion: {
-            problem_identified: debug.step2_raw_query.count === 0 ? 'NO_DATA_IN_DATABASE' :
-                              debug.step3_with_filter.count === 0 ? 'TIMEZONE_ISSUE' :
-                              debug.step5_analyzer_output?.anomalies_in_constructor === 0 ? 'FILTER_REMOVING_DATA' :
-                              debug.step6_final_result?.anomalies_in_marketState.length === 0 ? 'DETECT_ANOMALIES_ISSUE' :
-                              'UNKNOWN'
-          }
-        });
-        
-      } catch (error) {
-        res.status(500).json({
-          success: false,
-          error: error.message,
-          stack: error.stack
-        });
+// ============================================================================
+// ENDPOINT 1: LIQUIDATION STATS
+// ============================================================================
+/**
+ * GET /api/liquidations/stats
+ * 
+ * Retorna estatísticas gerais de liquidações em múltiplos períodos.
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   success: true,
+ *   data: {
+ *     totalValue: {
+ *       last1h: 2500000,      // $ liquidado última 1h
+ *       last4h: 8750000,      // $ liquidado últimas 4h
+ *       last24h: 45000000     // $ liquidado últimas 24h
+ *     },
+ *     imbalance1h: {
+ *       longLiquidated: 1800000,   // $ de longs liquidados
+ *       shortLiquidated: 700000,   // $ de shorts liquidados
+ *       ratio: 0.72,               // Proporção long/(long+short)
+ *       direction: "BEARISH"       // BEARISH/BULLISH/NEUTRAL
+ *     },
+ *     cascade: false,              // Se cascata está ativa
+ *     largestLiquidation: {
+ *       timestamp: 1704047400000,
+ *       side: "SELL",
+ *       value: 250000,
+ *       size: "MASSIVE"
+ *     },
+ *     count: {
+ *       last1h: 45,
+ *       last4h: 180,
+ *       last24h: 892
+ *     },
+ *     lastUpdate: 1704050000000
+ *   },
+ *   timestamp: "2025-12-31T10:00:00.000Z"
+ * }
+ * 
+ * CASOS DE USO:
+ * - Dashboard principal (card de liquidações)
+ * - Análise de pressão de mercado
+ * - Detecção de sentimento (long vs short)
+ */
+this.app.get('/api/liquidations/stats', async (req, res) => {
+  try {
+    // Obter stats do LiquidationTracker via DataCollector
+    const stats = this.dataCollector.getLiquidationStats();
+    
+    // Verificar se LiquidationTracker está disponível
+    if (!stats) {
+      return res.status(503).json({
+        success: false,
+        error: 'LiquidationTracker não está disponível'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: stats,
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter liquidation stats', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 2: LIQUIDATION ENERGY
+// ============================================================================
+/**
+ * GET /api/liquidations/energy
+ * 
+ * Retorna o "energy score" das liquidações para o Half Pipe Model.
+ * Combina valor, frequência, cascata e imbalance em um score normalizado.
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   success: true,
+ *   data: {
+ *     score: 0.78,                    // Score normalizado 0-1
+ *     level: "HIGH",                  // VERY_LOW/LOW/MEDIUM/HIGH/EXTREME
+ *     direction: "BEARISH",           // BULLISH/NEUTRAL/BEARISH
+ *     components: {
+ *       value: 0.25,                  // Contribuição do valor (40%)
+ *       frequency: 0.18,              // Contribuição da frequência (30%)
+ *       cascade: 0,                   // Boost de cascata (0 ou +0.5)
+ *       imbalance: 0.44               // Contribuição do imbalance (30%)
+ *     },
+ *     rawData: {
+ *       totalValue: { ... },
+ *       imbalance1h: { ... },
+ *       cascade: false,
+ *       count: { ... }
+ *     }
+ *   },
+ *   timestamp: "2025-12-31T10:00:00.000Z"
+ * }
+ * 
+ * INTERPRETAÇÃO DO SCORE:
+ * - 0.0 - 0.2: VERY_LOW  - Energia mínima, mercado calmo
+ * - 0.2 - 0.4: LOW       - Energia baixa, poucas liquidações
+ * - 0.4 - 0.6: MEDIUM    - Energia moderada, movimento normal
+ * - 0.6 - 0.8: HIGH      - Energia alta, possível escape iminente
+ * - 0.8 - 1.0: EXTREME   - Energia extrema, escape muito provável
+ * 
+ * CASOS DE USO:
+ * - Half Pipe Model (calcular P_escape)
+ * - Alertas de escape iminente
+ * - Dashboard de energia de mercado
+ */
+this.app.get('/api/liquidations/energy', async (req, res) => {
+  try {
+    // Obter energy score do LiquidationTracker
+    const energy = this.dataCollector.getLiquidationEnergy();
+    
+    if (!energy) {
+      return res.status(503).json({
+        success: false,
+        error: 'LiquidationTracker não está disponível'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: energy,
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter liquidation energy', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 3: LIQUIDATION SUMMARY
+// ============================================================================
+/**
+ * GET /api/liquidations/summary
+ * 
+ * Retorna um resumo completo combinando stats + energy em uma única chamada.
+ * Útil para reduzir número de requests.
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   success: true,
+ *   data: {
+ *     stats: { ... },      // Mesmo formato de /stats
+ *     energy: { ... },     // Mesmo formato de /energy
+ *     connected: true,     // Status da conexão WebSocket
+ *     lastUpdate: 1704050000000
+ *   }
+ * }
+ * 
+ * CASOS DE USO:
+ * - Obter todos os dados de liquidação de uma vez
+ * - Reduzir latência (1 request em vez de 2)
+ * - Dashboard que precisa de visão completa
+ */
+this.app.get('/api/liquidations/summary', async (req, res) => {
+  try {
+    const stats = this.dataCollector.getLiquidationStats();
+    const energy = this.dataCollector.getLiquidationEnergy();
+    
+    if (!stats || !energy) {
+      return res.status(503).json({
+        success: false,
+        error: 'LiquidationTracker não está disponível'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        stats: stats,
+        energy: energy,
+        connected: this.dataCollector.liquidationTracker?.connected || false,
+        lastUpdate: Date.now()
       }
     });
+  } catch (error) {
+    this.logger.error('Erro ao obter liquidation summary', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 4: RECENT LIQUIDATIONS
+// ============================================================================
+/**
+ * GET /api/liquidations/recent
+ * 
+ * Retorna lista de liquidações recentes em um período específico.
+ * 
+ * QUERY PARAMS:
+ * - minutes (opcional): Número de minutos para buscar (padrão: 5)
+ * 
+ * EXEMPLO:
+ * GET /api/liquidations/recent?minutes=10
+ * 
+ * RESPOSTA:
+ * {
+ *   success: true,
+ *   data: {
+ *     liquidations: [
+ *       {
+ *         timestamp: 1704050000000,
+ *         side: "SELL",              // BUY = short liquidado, SELL = long liquidado
+ *         price: 95000.00,
+ *         quantity: 0.500,
+ *         value: 47500.00,
+ *         size: "LARGE"              // SMALL/MEDIUM/LARGE/MASSIVE
+ *       },
+ *       // ... mais liquidações ...
+ *     ],
+ *     count: 15,
+ *     totalValue: 750000,
+ *     timeRange: {
+ *       start: "2025-12-31T09:55:00.000Z",
+ *       end: "2025-12-31T10:00:00.000Z",
+ *       minutes: 5
+ *     }
+ *   },
+ *   timestamp: "2025-12-31T10:00:00.000Z"
+ * }
+ * 
+ * CASOS DE USO:
+ * - Timeline de liquidações
+ * - Análise de padrões temporais
+ * - Debugging de eventos específicos
+ */
+this.app.get('/api/liquidations/recent', async (req, res) => {
+  try {
+    const minutes = parseInt(req.query.minutes) || 5;
+    const now = Date.now();
+    const startTime = now - (minutes * 60 * 1000);
+    
+    // Acessar diretamente o liquidationTracker para getLiquidations()
+    const tracker = this.dataCollector.liquidationTracker;
+    
+    if (!tracker) {
+      return res.status(503).json({
+        success: false,
+        error: 'LiquidationTracker não está disponível'
+      });
+    }
+    
+    const liquidations = tracker.getLiquidations(startTime, now);
+    
+    res.json({
+      success: true,
+      data: {
+        liquidations: liquidations,
+        count: liquidations.length,
+        totalValue: liquidations.reduce((sum, l) => sum + l.value, 0),
+        timeRange: {
+          start: new Date(startTime).toISOString(),
+          end: new Date(now).toISOString(),
+          minutes: minutes
+        }
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter liquidações recentes', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 5: EARLY LIQUIDATIONS (H2 - Falso Escape)
+// ============================================================================
+/**
+ * GET /api/liquidations/early
+ * 
+ * Detecta "early spike" de liquidações - indicador de H2 (Falso Escape).
+ * Quando >70% das liquidações ocorrem nos primeiros minutos, geralmente
+ * indica stop hunt e o preço tende a voltar ao half-pipe.
+ * 
+ * QUERY PARAMS:
+ * - minutes (opcional): Janela de tempo para "early" (padrão: 2)
+ * 
+ * EXEMPLO:
+ * GET /api/liquidations/early?minutes=2
+ * 
+ * RESPOSTA:
+ * {
+ *   success: true,
+ *   data: {
+ *     early: {
+ *       count: 35,                   // Liquidações nos primeiros X minutos
+ *       totalCount: 45,              // Total de liquidações
+ *       percentage: 0.78,            // 78% foram early
+ *       value: 1950000,              // $ liquidado early
+ *       totalValue: 2500000,         // $ total liquidado
+ *       minutes: 2                   // Janela de tempo
+ *     },
+ *     risk: "HIGH",                  // LOW/MEDIUM/HIGH
+ *     warning: "Mais de 70% das liquidações nos primeiros minutos - Possível falso escape (stop hunt)"
+ *   },
+ *   timestamp: "2025-12-31T10:00:00.000Z"
+ * }
+ * 
+ * INTERPRETAÇÃO:
+ * - percentage < 0.5: Distribuição normal, sem alerta
+ * - percentage 0.5-0.7: MEDIUM risk, monitorar
+ * - percentage > 0.7: HIGH risk, provável falso escape (H2)
+ * 
+ * CASOS DE USO:
+ * - Detectar armadilhas de mercado (stop hunt)
+ * - Validar hipótese H2 (Falso Escape)
+ * - Alertas de "não entrar agora"
+ */
+this.app.get('/api/liquidations/early', async (req, res) => {
+  try {
+    const minutes = parseInt(req.query.minutes) || 2;
+    const tracker = this.dataCollector.liquidationTracker;
+    
+    if (!tracker) {
+      return res.status(503).json({
+        success: false,
+        error: 'LiquidationTracker não está disponível'
+      });
+    }
+    
+    const early = tracker.getEarlyLiquidations(minutes);
+    
+    // Classificar risco
+    let risk = 'LOW';
+    let warning = null;
+    
+    if (early.percentage > 0.7) {
+      risk = 'HIGH';
+      warning = 'Mais de 70% das liquidações nos primeiros minutos - Possível falso escape (stop hunt)';
+    } else if (early.percentage > 0.5) {
+      risk = 'MEDIUM';
+      warning = 'Liquidações concentradas no início - Monitorar para falso escape';
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        early: early,
+        risk: risk,
+        warning: warning
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter early liquidations', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 6: LIQUIDATION GROWTH (H1 - Escape Bom)
+// ============================================================================
+/**
+ * GET /api/liquidations/growth
+ * 
+ * Analisa taxa de crescimento das liquidações ao longo do tempo.
+ * Crescimento gradual indica H1 (Escape Bom por fluxo real).
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   success: true,
+ *   data: {
+ *     growth: {
+ *       trend: "INCREASING",         // INCREASING/STABLE/DECREASING
+ *       growth: 0.72,                // Taxa de crescimento (0-1)
+ *       buckets: [
+ *         { period: "0-5min", value: 500000 },
+ *         { period: "5-10min", value: 750000 },
+ *         { period: "10-15min", value: 1200000 }
+ *       ]
+ *     },
+ *     quality: "GOOD",               // GOOD/NEUTRAL/POOR/UNKNOWN
+ *     description: "Liquidações crescendo gradualmente - Possível escape direcional por fluxo real (H1)"
+ *   },
+ *   timestamp: "2025-12-31T10:00:00.000Z"
+ * }
+ * 
+ * INTERPRETAÇÃO:
+ * - INCREASING + growth > 0.5: GOOD - Escape direcional (H1)
+ * - STABLE: NEUTRAL - Sem sinal claro
+ * - DECREASING: POOR - Energia enfraquecendo
+ * 
+ * CASOS DE USO:
+ * - Validar hipótese H1 (Escape Bom)
+ * - Confirmar continuidade de movimento
+ * - Alertas de "entrada segura"
+ */
+this.app.get('/api/liquidations/growth', async (req, res) => {
+  try {
+    const tracker = this.dataCollector.liquidationTracker;
+    
+    if (!tracker) {
+      return res.status(503).json({
+        success: false,
+        error: 'LiquidationTracker não está disponível'
+      });
+    }
+    
+    const growth = tracker.getLiquidationGrowth();
+    
+    // Classificar qualidade do escape
+    let quality = 'UNKNOWN';
+    let description = '';
+    
+    if (growth.trend === 'INCREASING' && growth.growth > 0.5) {
+      quality = 'GOOD';
+      description = 'Liquidações crescendo gradualmente - Possível escape direcional por fluxo real (H1)';
+    } else if (growth.trend === 'STABLE') {
+      quality = 'NEUTRAL';
+      description = 'Liquidações estáveis - Sem sinal claro de escape';
+    } else if (growth.trend === 'DECREASING') {
+      quality = 'POOR';
+      description = 'Liquidações diminuindo - Energia enfraquecendo';
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        growth: growth,
+        quality: quality,
+        description: description
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao obter liquidation growth', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENDPOINT 7: CASCADE DETECTION
+// ============================================================================
+/**
+ * GET /api/liquidations/cascade
+ * 
+ * Detecta se uma cascata de liquidações está em andamento.
+ * Cascata = >10 liquidações por minuto (configurável).
+ * 
+ * QUERY PARAMS: Nenhum
+ * 
+ * RESPOSTA:
+ * {
+ *   success: true,
+ *   data: {
+ *     cascadeDetected: true,         // Se cascata está ativa
+ *     liquidationsLastMinute: 15,    // Liquidações no último minuto
+ *     threshold: 10,                 // Threshold configurado
+ *     recentLiquidations: [
+ *       { timestamp: ..., side: "SELL", value: 50000, ... },
+ *       // ... últimas 10 liquidações ...
+ *     ]
+ *   },
+ *   timestamp: "2025-12-31T10:00:00.000Z"
+ * }
+ * 
+ * INTERPRETAÇÃO:
+ * - cascadeDetected = true: Energia extrema, escape iminente ou em curso
+ * - liquidationsLastMinute > threshold: Pressão intensa
+ * 
+ * CASOS DE USO:
+ * - Alertas de emergência
+ * - Pausar trading automático
+ * - Notificações push
+ * - Dashboard de risco
+ */
+this.app.get('/api/liquidations/cascade', async (req, res) => {
+  try {
+    const stats = this.dataCollector.getLiquidationStats();
+    const tracker = this.dataCollector.liquidationTracker;
+    
+    if (!stats || !tracker) {
+      return res.status(503).json({
+        success: false,
+        error: 'LiquidationTracker não está disponível'
+      });
+    }
+    
+    // Detalhes da cascata
+    const now = Date.now();
+    const lastMinute = tracker.getLiquidations(now - 60 * 1000, now);
+    
+    res.json({
+      success: true,
+      data: {
+        cascadeDetected: stats.cascade,
+        liquidationsLastMinute: lastMinute.length,
+        threshold: tracker.config.cascadeThreshold,
+        recentLiquidations: lastMinute.slice(0, 10)  // Últimas 10
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    this.logger.error('Erro ao detectar cascata', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * ============================================================================
+ * FIM DOS LIQUIDATION ENDPOINTS
+ * ============================================================================
+ * 
+ * PRÓXIMOS PASSOS:
+ * 1. Copiar este bloco completo
+ * 2. Colar dentro de setupRoutes() no server.js
+ * 3. Reiniciar o servidor
+ * 4. Testar endpoints com curl ou Postman
+ * 
+ * TESTES RÁPIDOS:
+ * curl http://localhost:3300/api/liquidations/energy
+ * curl http://localhost:3300/api/liquidations/stats
+ * curl http://localhost:3300/api/liquidations/recent?minutes=10
+ * 
+ * DOCUMENTAÇÃO COMPLETA:
+ * Ver LIQUIDATION_TRACKER_INTEGRATION.md
+ * ============================================================================
+ */
+
 
 
     // Regime History endpoint
