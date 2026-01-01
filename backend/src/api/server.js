@@ -2277,7 +2277,345 @@ this.app.get('/api/orderbook/history', async (req, res) => {
     });
   }
 });
- 
+
+// =============================================================================
+// ESCAPE TYPE DETECTOR ENDPOINTS
+// =============================================================================
+
+  /**
+   * GET /api/escape/detect
+   * Returns current escape type detection
+   */
+  this.app.get('/api/escape/detect', (req, res) => {
+    try {
+      if (!this.dataCollector.escapeTypeDetector) {
+        return res.status(503).json({
+          success: false,
+          error: 'EscapeTypeDetector not initialized'
+        });
+      }
+      
+      const detection = this.dataCollector.escapeTypeDetector.getCurrentDetection();
+      
+      if (!detection) {
+        return res.status(200).json({
+          success: true,
+          timestamp: new Date().toISOString(),
+          detection: {
+            type: 'NONE',
+            confidence: 0,
+            direction: 'NEUTRAL',
+            interpretation: 'No detection available yet. Waiting for data...'
+          }
+        });
+      }
+      
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        detection
+      });
+      
+    } catch (error) {
+      this.logger.error('[API] Error in /api/escape/detect:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/escape/probability
+   * Returns escape probability (P_escape)
+   */
+  this.app.get('/api/escape/probability', (req, res) => {
+    try {
+      if (!this.dataCollector.escapeTypeDetector) {
+        return res.status(503).json({
+          success: false,
+          error: 'EscapeTypeDetector not initialized'
+        });
+      }
+      
+      const detection = this.dataCollector.escapeTypeDetector.getCurrentDetection();
+      
+      if (!detection || !detection.metrics) {
+        return res.status(200).json({
+          success: true,
+          timestamp: new Date().toISOString(),
+          probability: {
+            P_escape: 0,
+            classification: 'UNKNOWN',
+            components: {},
+            interpretation: 'No data available yet'
+          }
+        });
+      }
+      
+      const P_escape = detection.metrics.P_escape;
+      let classification = 'MEDIUM';
+      if (P_escape > 0.7) classification = 'HIGH';
+      else if (P_escape < 0.4) classification = 'LOW';
+      
+      const interpretation = 
+        P_escape > 0.7 ? 
+          `High probability of escaping gamma wall. Strong energy (${detection.metrics.totalEnergy.toFixed(2)}) relative to potential (${detection.metrics.potential.toFixed(2)}).` :
+        P_escape < 0.4 ?
+          `Low probability of escape. Weak energy (${detection.metrics.totalEnergy.toFixed(2)}) relative to potential (${detection.metrics.potential.toFixed(2)}). Expect rejection.` :
+          `Medium probability. Energy (${detection.metrics.totalEnergy.toFixed(2)}) and potential (${detection.metrics.potential.toFixed(2)}) are balanced. Watch closely.`;
+      
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        probability: {
+          P_escape,
+          classification,
+          components: {
+            sustainedEnergy: detection.metrics.sustainedEnergy,
+            injectedEnergy: detection.metrics.injectedEnergy,
+            totalEnergy: detection.metrics.totalEnergy,
+            potential: detection.metrics.potential
+          },
+          interpretation
+        }
+      });
+      
+    } catch (error) {
+      this.logger.error('[API] Error in /api/escape/probability:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/escape/energy
+   * Returns energy breakdown
+   */
+  this.app.get('/api/escape/energy', (req, res) => {
+    try {
+      if (!this.dataCollector.escapeTypeDetector) {
+        return res.status(503).json({
+          success: false,
+          error: 'EscapeTypeDetector not initialized'
+        });
+      }
+      
+      const detection = this.dataCollector.escapeTypeDetector.getCurrentDetection();
+      
+      if (!detection || !detection.metrics) {
+        return res.status(200).json({
+          success: true,
+          timestamp: new Date().toISOString(),
+          energy: {
+            sustained: { score: 0, components: {} },
+            injected: { score: 0 },
+            total: 0,
+            classification: 'UNKNOWN'
+          }
+        });
+      }
+      
+      const orderBook = this.dataCollector.getOrderBookMetrics() ?
+        this.dataCollector.getOrderBookMetrics() : null;
+      const liquidations = this.dataCollector.getLiquidationMetrics() ?
+        this.dataCollector.getLiquidationMetrics() : null;
+      
+      const sustainedComponents = orderBook ? {
+        bookImbalance: Math.abs(orderBook.BI || 0),
+        biPersistence: orderBook.BI_persistence || 0,
+        spreadQuality: Math.max(0, Math.min(1, 1 - (Math.abs(orderBook.spread_pct || 0) * 10000))),
+        depthComponent: Math.max(0, Math.min(1, ((orderBook.depthChange || 0) + 0.5) / 1.0))
+      } : {};
+      
+      const total = detection.metrics.totalEnergy;
+      let classification = 'MEDIUM';
+      if (total > 0.8) classification = 'HIGH';
+      else if (total > 0.6) classification = 'MEDIUM-HIGH';
+      else if (total > 0.4) classification = 'MEDIUM';
+      else if (total > 0.2) classification = 'MEDIUM-LOW';
+      else classification = 'LOW';
+      
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        energy: {
+          sustained: {
+            score: detection.metrics.sustainedEnergy,
+            components: sustainedComponents
+          },
+          injected: {
+            score: detection.metrics.injectedEnergy,
+            volume5min: liquidations?.recent5min?.totalVolume || 0,
+            cascadeDetected: liquidations?.cascade?.detected || false,
+            dominantSide: liquidations?.recent5min?.dominantSide || 'NEUTRAL'
+          },
+          total,
+          classification
+        }
+      });
+      
+    } catch (error) {
+      this.logger.error('[API] Error in /api/escape/energy:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/escape/conditions
+   * Returns condition checks for each hypothesis
+   */
+  this.app.get('/api/escape/conditions', (req, res) => {
+    try {
+      if (!this.dataCollector.escapeTypeDetector) {
+        return res.status(503).json({
+          success: false,
+          error: 'EscapeTypeDetector not initialized'
+        });
+      }
+
+      const detection = this.dataCollector.escapeTypeDetector.getCurrentDetection();
+
+      if (!detection || !detection.conditions) {
+        return res.status(200).json({
+          success: true,
+          timestamp: new Date().toISOString(),
+          conditions: {}
+        });
+      }
+      
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        conditions: detection.conditions,
+        currentType: detection.type,
+        currentConfidence: detection.confidence
+      });
+      
+    } catch (error) {
+      this.logger.error('[API] Error in /api/escape/conditions:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/escape/history
+   * Returns detection history
+   */
+  this.app.get('/api/escape/history', (req, res) => {
+    try {
+      if (!this.dataCollector.escapeTypeDetector) {
+        return res.status(503).json({
+          success: false,
+          error: 'EscapeTypeDetector not initialized'
+        });
+      }
+      
+      const minutes = Math.min(3600, Math.max(1, parseInt(req.query.minutes) || 60));
+      const history = this.dataCollector.escapeTypeDetector.getHistory(minutes);
+      const stats = this.dataCollector.escapeTypeDetector.getStats();
+      
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        minutes,
+        history,
+        stats
+      });
+      
+    } catch (error) {
+      this.logger.error('[API] Error in /api/escape/history:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/escape/summary
+   * Returns complete summary
+   */
+  this.app.get('/api/escape/summary', (req, res) => {
+    try {
+      if (!this.dataCollector.escapeTypeDetector) {
+        return res.status(503).json({
+          success: false,
+          error: 'EscapeTypeDetector not initialized'
+        });
+      }
+      
+      const detection = this.dataCollector.escapeTypeDetector.getCurrentDetection();
+      const history = this.dataCollector.escapeTypeDetector.getHistory(10);
+      const stats = this.dataCollector.escapeTypeDetector.getStats();
+      const alerts = this.dataCollector.escapeTypeDetector.getAlerts();
+
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        summary: {
+          currentDetection: detection,
+          recentHistory: history,
+          stats,
+          alerts
+        }
+      });
+      
+    } catch (error) {
+      this.logger.error('[API] Error in /api/escape/summary:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/escape/alerts
+   * Returns active alerts
+   */
+  this.app.get('/api/escape/alerts', (req, res) => {
+    try {
+      if (!this.dataCollector.escapeTypeDetector) {
+        return res.status(503).json({
+          success: false,
+          error: 'EscapeTypeDetector not initialized'
+        });
+      }
+
+      const alerts = this.dataCollector.escapeTypeDetector.getAlerts();
+
+      const summary = {
+        totalAlerts: alerts.length,
+        criticalCount: alerts.filter(a => a.severity === 'CRITICAL').length,
+        highCount: alerts.filter(a => a.severity === 'HIGH').length,
+        mediumCount: alerts.filter(a => a.severity === 'MEDIUM').length,
+        lowCount: alerts.filter(a => a.severity === 'LOW').length
+      };
+      
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        alerts,
+        summary
+      });
+      
+    } catch (error) {
+      this.logger.error('[API] Error in /api/escape/alerts:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }); 
 
 
 
