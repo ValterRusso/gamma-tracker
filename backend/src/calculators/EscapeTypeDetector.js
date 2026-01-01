@@ -86,8 +86,10 @@ class EscapeTypeDetector extends EventEmitter {
    */
   detect() {
     try {
+      
       // 1. Collect data from all sources
       const data = this.collectData();
+      
       
       
       // 2. Validate data availability
@@ -104,10 +106,12 @@ class EscapeTypeDetector extends EventEmitter {
       const h1 = this.checkH1Conditions(metrics, data);
       const h2 = this.checkH2Conditions(metrics, data);
       const h3 = this.checkH3Conditions(metrics, data);
+
+      
       
       // 5. Select best match
       const detection = this.selectBestMatch(h1, h2, h3, metrics, data);
-      
+      // console.log('[EscapeDetector] ✅ Detection:', detection.type, detection.confidence);
       // 6. Update state and history
       this.updateState(detection);
       
@@ -117,7 +121,8 @@ class EscapeTypeDetector extends EventEmitter {
       return detection;
       
     } catch (error) {
-      console.error('[EscapeTypeDetector] Detection error:', error.message);
+      console.error('[EscapeTypeDetector] ❌ Detection error:', error.message);
+      console.error('[EscapeTypeDetector] Stack:', error.stack);
       return this.createNoDetection('Detection error');
     }
   }
@@ -172,8 +177,20 @@ class EscapeTypeDetector extends EventEmitter {
     const sustainedEnergy = this.calculateSustainedEnergy(data.orderBook);
     const injectedEnergy = this.calculateInjectedEnergy(data.liquidations);
     const totalEnergy = (sustainedEnergy + injectedEnergy) / 2;
+
+    // DEBUG: Ver o que está chegando
+    //console.log('[EscapeDetector] calculateMetrics - GEX:', {
+    //hasGEX: !!data.gex,
+    //gexKeys: data.gex ? Object.keys(data.gex) : null,
+    //totalGEX: data.gex?.totalGEX,
+    //putWall: data.gex?.putWall,
+    //callWall: data.gex?.callWall,
+    //currentPrice: data.currentPrice
+    // });
     
     const potential = this.calculatePotential(data.gex, data.currentPrice);
+    
+
     const P_escape = this.calculateEscapeProbability(totalEnergy, potential);
     
     const direction = this.determineDirection(data.orderBook, data.liquidations);
@@ -230,37 +247,58 @@ class EscapeTypeDetector extends EventEmitter {
    */
   calculatePotential(gex, currentPrice) {
     if (!gex || !currentPrice) {
-       
+      
       return 0.5; // Default medium potential
     }
     
     // GEX magnitude component (normalized to 0-1)
-    const gexMagnitude = Math.abs(gex.totalGEX || 0) / 1e9; // Billions
+     // Handle both number and object formats
+     const totalGEXValue = typeof gex.totalGEX === 'object' 
+    ? Math.abs(gex.totalGEX.total || 0)  // ✅ Pega .total se for objeto
+    : Math.abs(gex.totalGEX || 0);        // ✅ Usa direto se for número
+
+    const gexMagnitude = totalGEXValue / 1e9; // Billions
     const gexComponent = Math.min(1, gexMagnitude / 0.5); // Cap at $500M
+
+    // Wall strength component
+    const putWallGEX = Math.abs(gex.putWall?.gex || 0);
+    const callWallGEX = Math.abs(gex.callWall?.gex || 0);
+
+    // Use the stronger wall
+    const strongerWallGEX = Math.max(putWallGEX, callWallGEX);
+    const wallStrength = Math.min(1, strongerWallGEX / 1e9); // Normalize
+
+    // Wall proximity component
+    const putWallDistance = gex.putWall?.distancePercent || 1;
+    const callWallDistance = gex.callWall?.distancePercent || 1;
+
+    // Use the closer wall
+    const closerWallDistance = Math.min(putWallDistance, callWallDistance);
+    const wallProximity = Math.max(0, 1 - closerWallDistance); // Closer = higher score
     
     // Wall strength component
-    const putWall = gex.putWall || {};
-    const callWall = gex.callWall || {};
-    const maxWallStrength = Math.max(
-      putWall.strength || 0,
-      callWall.strength || 0
-    );
+    // const putWall = gex.putWall || {};
+    // const callWall = gex.callWall || {};
+    // const maxWallStrength = Math.max(
+    //  putWall.strength || 0,
+    //  callWall.strength || 0
+    // );
     
     // Wall proximity component (closer = higher potential)
-    const putDistance = putWall.strike ? 
-      Math.abs(currentPrice - putWall.strike) / currentPrice : 1;
-    const callDistance = callWall.strike ? 
-      Math.abs(currentPrice - callWall.strike) / currentPrice : 1;
-    const minDistance = Math.min(putDistance, callDistance);
-    const proximityComponent = Math.max(0, 1 - (minDistance / 0.1)); // Within 10%
+    //const putDistance = putWall.strike ? 
+    //  Math.abs(currentPrice - putWall.strike) / currentPrice : 1;
+    //const callDistance = callWall.strike ? 
+   //   Math.abs(currentPrice - callWall.strike) / currentPrice : 1;
+    //const minDistance = Math.min(putDistance, callDistance);
+    //const proximityComponent = Math.max(0, 1 - (minDistance / 0.1)); // Within 10%
     
     const potential = (
       gexComponent * 0.6 +
-      maxWallStrength * 0.3 +
-      proximityComponent * 0.1
+      wallStrength * 0.3 +
+      wallProximity * 0.1
     );
     
-    return Math.max(0.1, Math.min(1, potential)); // Min 0.1 to avoid division by zero
+    return Math.max(0, Math.min(1, potential)); // Min 0.1 to avoid division by zero
   }
   
   /**
@@ -313,6 +351,13 @@ class EscapeTypeDetector extends EventEmitter {
     
     const putWall = gex.putWall || {};
     const callWall = gex.callWall || {};
+
+    // Helper function to calculate strength from gex value
+    const calculateStrength = (gexValue) => {
+      if (gexValue === undefined || gexValue === null) return 0;
+      const absGex = Math.abs(gexValue);
+      return Math.min(1, absGex / 1e9); // $1B = max strength
+    };
     
     let targetWall = null;
     
@@ -320,7 +365,7 @@ class EscapeTypeDetector extends EventEmitter {
       targetWall = {
         type: 'put',
         strike: putWall.strike,
-        strength: putWall.strength || 0,
+        strength: calculateStrength(putWall.gex),
         distance: (currentPrice - putWall.strike) / currentPrice,
         distanceAbs: Math.abs(currentPrice - putWall.strike)
       };
@@ -328,7 +373,7 @@ class EscapeTypeDetector extends EventEmitter {
       targetWall = {
         type: 'call',
         strike: callWall.strike,
-        strength: callWall.strength || 0,
+        strength: calculateStrength(callWall.gex),
         distance: (callWall.strike - currentPrice) / currentPrice,
         distanceAbs: Math.abs(callWall.strike - currentPrice)
       };
@@ -341,7 +386,7 @@ class EscapeTypeDetector extends EventEmitter {
         targetWall = {
           type: 'put',
           strike: putWall.strike,
-          strength: putWall.strength || 0,
+          strength: calculateStrength(putWall.gex),
           distance: (currentPrice - putWall.strike) / currentPrice,
           distanceAbs: putDist
         };
@@ -349,7 +394,7 @@ class EscapeTypeDetector extends EventEmitter {
         targetWall = {
           type: 'call',
           strike: callWall.strike,
-          strength: callWall.strength || 0,
+          strength: calculateStrength(callWall.gex),
           distance: (callWall.strike - currentPrice) / currentPrice,
           distanceAbs: callDist
         };
@@ -625,7 +670,28 @@ class EscapeTypeDetector extends EventEmitter {
   /**
    * Create no-detection object
    */
-  createNoDetection(reason, metrics = {}, data = {}) {
+  createNoDetection(reason, metrics = null, data = null) {
+    // Build metrics object
+    const metricsObj = metrics ? {
+    sustainedEnergy: metrics.sustainedEnergy || 0,
+    injectedEnergy: metrics.injectedEnergy || 0,
+    totalEnergy: metrics.totalEnergy || 0,
+    potential: metrics.potential || 0,
+    P_escape: metrics.P_escape || 0,
+    direction: metrics.direction || 'NEUTRAL',
+    wallInfo: metrics.wallInfo || null
+    } : {};
+
+    // Build rawData object
+    const rawDataObj = data ? {
+    currentPrice: data.currentPrice || null,
+    gammaFlip: data.gex?.gammaFlip || null,
+    bookImbalance: data.orderBook?.BI || null,
+    biPersistence: data.orderBook?.BI_persistence || null,
+    liquidationVolume5min: data.liquidations?.recent5min?.totalVolume || null,
+    cascadeDetected: data.liquidations?.cascade?.detected || false
+    } : {};
+
     return {
       type: 'NONE',
       confidence: 0,
@@ -642,41 +708,28 @@ class EscapeTypeDetector extends EventEmitter {
   /**
    * Generate human-readable interpretation
    */
-  generateInterpretation(hypothesis, metrics, data) {
-    const type = hypothesis.type;
-    const direction = metrics.direction;
-    const P_escape = metrics.P_escape;
-    const wall = metrics.wallInfo;
+    generateInterpretation(type, confidence, metrics, data) {
+    const { sustainedEnergy, injectedEnergy, potential, P_escape } = metrics;
     
-    const ob = data.orderBook;
-    const liq = data.liquidations;
+    // Para H2, inverter a probabilidade
+    const effectiveP = (type === 'H2') ? (1 - P_escape) : P_escape;
     
-    if (type === 'H1') {
-      const wallStr = wall ? 
-        `$${wall.strike.toFixed(0)} ${wall.type} wall (${(wall.distance * 100).toFixed(1)}% away)` : 
-        'gamma wall';
+    // Classificar probabilidade
+    const probClass = effectiveP > 0.7 ? 'High' : 
+                    effectiveP > 0.4 ? 'Medium' : 'Low';
       
-      return `🚀 GOOD ESCAPE detected with ${(hypothesis.confidence * 100).toFixed(0)}% confidence. ` +
-        `Strong sustained ${direction.toLowerCase()} pressure (BI persistence: ${(ob.biPersistence?.value * 100).toFixed(0)}%) ` +
-        `with healthy liquidity (depth change: ${(ob.depth?.depthChange * 100).toFixed(0)}%). ` +
-        `Moderate liquidations ($${(liq.recent5min?.totalVolume / 1e6).toFixed(1)}M in 5min) providing fuel. ` +
-        `High probability (${(P_escape * 100).toFixed(0)}%) of breaking through ${wallStr}.`;
+    if (type === 'H1') {
+      return `🚀 GOOD ESCAPE detected with ${(confidence * 100).toFixed(0)}% confidence!.${probClass}
+      probability (${(effectiveP *100).toFixed(0)}%) of sustained breakout.`
     }
     
     if (type === 'H2') {
-      const wallStr = wall ? 
-        `$${wall.strike.toFixed(0)} ${wall.type} wall (${(wall.distance * 100).toFixed(1)}% away)` : 
-        'gamma wall';
-      
-      return `⚠️ FALSE ESCAPE detected with ${(hypothesis.confidence * 100).toFixed(0)}% confidence. ` +
-        `Initial ${direction.toLowerCase()} pressure but weak persistence (${(ob.biPersistence?.value * 100).toFixed(0)}%). ` +
-        `Low liquidation volume ($${(liq.recent5min?.totalVolume / 1e6).toFixed(1)}M). ` +
-        `Strong ${wallStr} acting as resistance. ` +
-        `Low probability (${(P_escape * 100).toFixed(0)}%) of breakthrough - expect reversal.`;
+      return ` FALSE ESCAPE detected with ${(confidence * 100).toFixed(0)}% confidence!. ${probClass}
+      probability (${(effectiveP *100).toFixed(0)}%) of reversal back into the Half Pipe.`
     }
     
     if (type === 'H3') {
-      return `💀 LIQUIDITY COLLAPSE detected with ${(hypothesis.confidence * 100).toFixed(0)}% confidence! ` +
+      return `💀 LIQUIDITY COLLAPSE detected with ${(confidence * 100).toFixed(0)}% confidence! ` +
         `DANGER: Liquidation cascade in progress ($${(liq.recent5min?.totalVolume / 1e6).toFixed(1)}M in 5min). ` +
         `Liquidity draining (depth: ${(ob.depth?.depthChange * 100).toFixed(0)}%), ` +
         `spreads widening (quality: ${(ob.spreadQuality?.score * 100).toFixed(0)}%). ` +
