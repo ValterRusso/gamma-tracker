@@ -8,6 +8,7 @@ class GEXCalculator {
   constructor(spotPrice) {
     this.logger = new Logger('GEXCalculator');
     this.spotPrice = spotPrice;
+    this.lastMetrics = null;
   }
 
   /**
@@ -468,7 +469,7 @@ findMaxGEXStrike(options) {
     const callWall = this.findCallWall(options);
     const maxGEXStrike = this.findMaxGEXStrike(options);
     
-    return {
+    this.lastMetrics = {
       spotPrice: this.spotPrice,
       totalGEX: totalGEX,
       gammaProfile: gammaProfile,
@@ -478,7 +479,16 @@ findMaxGEXStrike(options) {
       maxGEXStrike: maxGEXStrike,
       timestamp: Date.now()
     };
+    return this.lastMetrics;
+  }
+  /**
+   * Get last calculated GEX metrics
+   * @returns {Object|null} - Last metrics or null if not calculated yet
+   */
+  getGEX() {
+    return this.lastMetrics;
   }
 }
+
 
 module.exports = GEXCalculator;
