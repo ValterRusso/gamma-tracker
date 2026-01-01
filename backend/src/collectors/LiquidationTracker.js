@@ -7,7 +7,7 @@
  * Features:
  * - Conexão WebSocket com auto-reconnect
  * - Histórico de liquidações (1h, 4h, 24h)
- * - Detecção de cascatas
+ * - Detecção de cascatas de liquidações
  * - Cálculo de energy score
  * - Análise de desequilíbrio long/short
  */
@@ -418,6 +418,68 @@ class LiquidationTracker extends EventEmitter {
       stats: stats,
       energy: energy,
       timestamp: new Date().toISOString()
+    };
+  }
+  
+  /**
+   * Get metrics in format expected by EscapeTypeDetector
+   * This is an adapter method that combines getStats() and getEnergyScore()
+   */
+  getMetrics() {
+    const stats = this.getStats();
+    const energy = this.getEnergyScore();
+    
+    // Calculate recent 5min metrics
+    const now = Date.now();
+    const fiveMinAgo = now - (5 * 60 * 1000);
+    const recent5min = this.liquidations.last1h.filter(l => l.timestamp >= fiveMinAgo);
+    
+    const recent5minValue = recent5min.reduce((sum, l) => sum + l.value, 0);
+    const recent5minLongs = recent5min.filter(l => l.side === 'BUY').reduce((sum, l) => sum + l.value, 0);
+    const recent5minShorts = recent5min.filter(l => l.side === 'SELL').reduce((sum, l) => sum + l.value, 0);
+    
+    let dominantSide = 'NEUTRAL';
+    if (recent5minLongs > recent5minShorts * 1.5) dominantSide = 'LONG';
+    else if (recent5minShorts > recent5minLongs * 1.5) dominantSide = 'SHORT';
+    
+    return {
+      // Energy score (0-1) for EscapeTypeDetector
+      energy: {
+        score: energy.score,
+        level: energy.level,
+        direction: energy.direction
+      },
+      
+      // Recent 5min data
+      recent5min: {
+        totalVolume: recent5minValue,
+        longVolume: recent5minLongs,
+        shortVolume: recent5minShorts,
+        dominantSide: dominantSide,
+        count: recent5min.length
+      },
+      
+      // Cascade detection
+      cascade: {
+        detected: stats.cascade,
+        timestamp: stats.cascade ? stats.lastUpdate : null
+      },
+      
+      // 1h statistics
+      last1h: {
+        totalValue: stats.totalValue.last1h,
+        longLiquidated: stats.imbalance1h.longLiquidated,
+        shortLiquidated: stats.imbalance1h.shortLiquidated,
+        ratio: stats.imbalance1h.ratio,
+        direction: stats.imbalance1h.direction,
+        count: stats.count.last1h
+      },
+      
+      // Largest liquidation
+      largestLiquidation: stats.largestLiquidation,
+      
+      // Timestamp
+      timestamp: stats.lastUpdate || new Date().toISOString()
     };
   }
 }
