@@ -14,6 +14,9 @@ const SpotPriceCollector = require('./SpotPriceCollector');
 const OpenInterestCollector = require('./OpenInterestCollector');
 const LiquidationTracker = require('./LiquidationTracker');
 const OrderBookAnalyzer = require('./OrderBookAnalyzer')
+const EscapeTypeDetector = require('../calculators/EscapeTypeDetector');
+const GEXCalculator = require('../calculators/GEXCalculator');
+const e = require('express');
 
 class DataCollector extends EventEmitter {
   constructor(config = {}) {
@@ -52,7 +55,14 @@ class DataCollector extends EventEmitter {
     this.liquidationTracker = null;
 
     // Order Book Analyzer (futuros)
-    this.OrderBookAnalyzer = null;
+    this.orderBookAnalyzer = null;
+
+    // Escape Type Detector
+    this.escapeTypeDetector = null;
+    this.detectionInterval = null;
+
+    // GEX Calculator
+    this.gexCalculator = null;
   }
 
   /**
@@ -78,6 +88,9 @@ class DataCollector extends EventEmitter {
       
       this.spotPriceCollector.on('price-updated', (data) => {
         this.spotPrice = data.price;
+        if (this.gexCalculator) {
+          this.gexCalculator.setSpotPrice(data.price);
+        }
         this.emit('spot-price-updated', data);
       });
       
@@ -154,8 +167,64 @@ class DataCollector extends EventEmitter {
         this.logger.error('❌ OrderBookAnalyzer error:', error);
         this.emit('orderbook-analyzer-error', error);
       });
+
+      // Conectar OrderBookAnalyzer
       this.orderBookAnalyzer.connect();
       this.logger.success('OrderBookAnalyzer iniciado');
+
+      // 11. Inicializar GEXCalculator
+      this.logger.info('[DataCollector] Initializing GEXCalculator...');
+      this.gexCalculator = new GEXCalculator(this.spotPrice);
+      this.logger.success('[DataCollector] GEXCalculator initialized');
+
+      // Calculate initial GEX metrics
+      if (this.options.size > 0) {
+        const optionsArray = Array.from(this.options.values());
+        this.gexCalculator.calculateAllMetrics(optionsArray);
+        this.logger.success('[DataCollector] GEXCalculator initialized with initial metrics');
+      } else {
+        this.logger.warn('[DataCollector] No options available for initial GEX calculation');
+      }      
+
+      // Inicializar EscapeTypeDetector
+      this.logger.info('[DataCollector] Initializing EscapeTypeDetector...');
+      this.escapeTypeDetector = new EscapeTypeDetector(this);
+
+      // run detection every second
+      this.detectionInterval = setInterval(() => {
+        try {
+          this.escapeTypeDetector.detect();
+        } catch (error) {
+          this.logger.error('[DataCollector] Detection error:', error.message);
+        }
+      }, 1000);
+
+      // Listen for escape detected events
+      this.escapeTypeDetector.on('detection', (detection) => {
+        // this.logger.info(`[escapeTypeDetector] ${detection.type} detected (confidence: ${(detection.confidence * 100).toFixed(0)}%)`);
+      });
+      
+      this.escapeTypeDetector.on('h1_detected', (detection) => {
+        this.logger.info('🚀 [escapeTypeDetector] H1 (Good Escape) detected!');
+        this.logger.info(`   ${detection.interpretation}`);
+      });
+      
+      this.escapeTypeDetector.on('h2_detected', (detection) => {
+        this.logger.warn('⚠️ [escapeTypeDetector] H2 (False Escape) detected!');
+        this.logger.warn(`   ${detection.interpretation}`);
+      });
+      
+      this.escapeTypeDetector.on('h3_detected', (detection) => {
+        this.logger.error('💀 [escapeTypeDetector] H3 (Liquidity Collapse) detected!');
+        this.logger.error(`   ${detection.interpretation}`);
+      });
+      
+      this.escapeTypeDetector.on('alert', (alert) => {
+        this.logger.warn(`🔔 [escapeTypeDetector] Alert: ${alert.message}`);
+      });
+
+      this.logger.success('[DataCollector] EscapeTypeDetector initialized');
+
       
       this.logger.success('DataCollector iniciado com sucesso');
       this.emit('ready');
@@ -197,6 +266,20 @@ class DataCollector extends EventEmitter {
     if (this.orderBookAnalyzer) {
       this.orderBookAnalyzer.disconnect();
       this.orderBookAnalyzer = null;
+    }
+    // Parar intervalo de detecção
+    if (this.detectionInterval) {
+      clearInterval(this.detectionInterval);
+      this.detectionInterval = null;
+    }
+    // Parar EscapeTypeDetector
+    if (this.escapeTypeDetector) {
+      this.escapeTypeDetector.removeAllListeners();
+      this.escapeTypeDetector = null;
+    } 
+    // Parar GEXCalculator
+    if (this.gexCalculator) {
+      this.gexCalculator = null;
     }
     
     // Fechar WebSockets
@@ -451,9 +534,19 @@ class DataCollector extends EventEmitter {
     this.logger.info(`Iniciando polling de gregas (intervalo: ${this.config.greeksPollingInterval}ms)`);
     this.logger.info('Ticker será atualizado via WebSocket em tempo real');
     
-    this.greeksPollingTimer = setInterval(() => {
-      this.fetchGreeks();
-      // NÃO chamar fetchTicker() aqui - usar WebSocket!
+    this.greeksPollingTimer = setInterval(async() => {
+      try {
+        await this.fetchGreeks();
+        // Recalculate GEX metrics after greeks update
+        if (this.gexCalculator && this.options.size > 0) {
+          const optionsArray = Array.from(this.options.values());
+          this.gexCalculator.calculateAllMetrics(optionsArray);
+          this.logger.debug('[DataCollector] GEX metrics recalculated after greeks update');
+        }
+      } catch (error) {
+        this.logger.error('Erro no polling de gregas:', error.message);
+      }
+      
     }, this.config.greeksPollingInterval);
   }
 
@@ -528,6 +621,15 @@ class DataCollector extends EventEmitter {
   }
 
   /**
+   * Get Liquidation metrics
+   */
+  getLiquidationMetrics() {
+    if (!this.liquidationTracker) return null;
+    return this.liquidationTracker.getMetrics();
+  }
+
+
+  /**
    * Obtém estatísticas de liquidações
    */
   getLiquidationStats() {
@@ -551,14 +653,14 @@ class DataCollector extends EventEmitter {
  */
   getOrderBookMetrics() {
     if (!this.orderBookAnalyzer) {
-      throw new Error('OrderBookAnalyzer não inicializado');
+      return null;
     }
     return this.orderBookAnalyzer.getMetrics();
   }
 
   getOrderBookImbalance() {
     if (!this.orderBookAnalyzer) {
-      throw new Error('OrderBookAnalyzer não inicializado');
+      return null;
     }
     return this.orderBookAnalyzer.getBookImbalance();
   }
@@ -598,6 +700,49 @@ class DataCollector extends EventEmitter {
     return this.orderBookAnalyzer.getHistory();
   }
 
+  /**
+ * Get GEX data
+ */
+  getGEX() {
+    if (!this.gexCalculator) return null;
+    return this.gexCalculator.getGEX();
+  }
+
+  /**
+ * Get current price
+ */
+  getCurrentPrice() {
+    // Return from your price source
+    // Example:
+    return this.spotPrice || null;
+  }
+
+  /**
+   * Get current escape detection
+   */
+  getEscapeDetection() {
+    if (!this.escapeTypeDetector) return null;
+    return this.escapeTypeDetector.getCurrentDetection();
+  }
+
+  /**
+   * Get escape detection history
+   */
+  getEscapeHistory(minutes = 60) {
+    if (!this.escapeTypeDetector) return [];
+    return this.escapeTypeDetector.getHistory(minutes);
+  }
+
+  /**
+   * Get escape alerts
+   */
+  getEscapeAlerts() {
+    if (!this.escapeTypeDetector) return [];
+    return this.escapeTypeDetector.getAlerts();
+  }
+
+
+
 
   /**
    * Obtém estatísticas do coletor
@@ -627,7 +772,7 @@ class DataCollector extends EventEmitter {
       stats.orderBookAnalyzerConnected = this.orderBookAnalyzer.connected;
       stats.orderBookEnergy = this.orderBookAnalyzer.getEnergyScore();
     }
-    
+
     return stats;
   }
   
