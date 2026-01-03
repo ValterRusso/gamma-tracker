@@ -2360,10 +2360,10 @@ this.app.get('/api/orderbook/history', async (req, res) => {
       
       const interpretation = 
         P_escape > 0.7 ? 
-          `High probability of escaping gamma wall. Strong energy (${detection.metrics.totalEnergy.toFixed(2)}) relative to potential (${detection.metrics.potential.toFixed(2)}).` :
+          `High probability of escaping gamma wall. Strong energy (${detection.metrics.totalEnergy.toFixed(2)}) relative to potential (${detection.metrics.potential.total.toFixed(2)}).` :
         P_escape < 0.4 ?
-          `Low probability of escape. Weak energy (${detection.metrics.totalEnergy.toFixed(2)}) relative to potential (${detection.metrics.potential.toFixed(2)}). Expect rejection.` :
-          `Medium probability. Energy (${detection.metrics.totalEnergy.toFixed(2)}) and potential (${detection.metrics.potential.toFixed(2)}) are balanced. Watch closely.`;
+          `Low probability of escape. Weak energy (${detection.metrics.totalEnergy.toFixed(2)}) relative to potential (${detection.metrics.potential.total.toFixed(2)}). Expect rejection.` :
+          `Medium probability. Energy (${detection.metrics.totalEnergy.toFixed(2)}) and potential (${detection.metrics.potential.total.toFixed(2)}) are balanced. Watch closely.`;
       
       res.json({
         success: true,
