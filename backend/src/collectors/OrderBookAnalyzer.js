@@ -47,12 +47,16 @@ class OrderBookAnalyzer extends EventEmitter {
     this.maxReconnectAttempts = 10;
     this.reconnectDelay = 5000;
     this.isConnected = false;
+    this.spotPrice = 0;
     
     // Order Book State
     this.bids = new Map();  // price → quantity
     this.asks = new Map();  // price → quantity
     this.lastUpdateId = 0;
     this.spotPrice = 0;     // Mid price
+    this.currentBids = [];
+    this.currentAsks = [];
+    
     
     // Métricas Atuais
     this.metrics = {
@@ -569,10 +573,20 @@ class OrderBookAnalyzer extends EventEmitter {
    * Obter todas as métricas
    */
   getMetrics() {
+
+     // Converter Maps para Arrays [[price, qty], ...]
+    const bidsArray = Array.from(this.bids.entries())
+      .sort((a, b) => b[0] - a[0]);  // Ordenar por preço (maior primeiro)
+    
+    const asksArray = Array.from(this.asks.entries())
+      .sort((a, b) => a[0] - b[0]);  // Ordenar por preço (menor primeiro)
+
     return {
       ...this.metrics,
       spotPrice: this.spotPrice,
-      symbol: this.symbol
+      symbol: this.symbol,
+      bids: bidsArray,
+      asks: asksArray
     };
   }
   
