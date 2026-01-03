@@ -21,6 +21,7 @@
 
 const EventEmitter = require('events');
 const IcebergDetector = require('./IcebergDetector');
+const { act } = require('react');
 
 class EscapeTypeDetector extends EventEmitter {
   constructor(dataCollector) {
@@ -226,13 +227,13 @@ class EscapeTypeDetector extends EventEmitter {
     // 6. Log iceberg details if detected
     if (potential.components?.iceberg?.detected) {
       const iceberg = potential.components.iceberg;
-      console.log(`[IcebergDetector] 🧊 Iceberg detected!`);
-      console.log(`  Confidence: ${iceberg.confidence}`);
-      console.log(`  Score: ${(iceberg.score * 100).toFixed(0)}%`);
-      console.log(`  Estimated hidden: ${iceberg.estimatedHiddenSize?.hidden?.toFixed(1)} BTC`);
-      console.log(`  Active signals: ${Object.keys(iceberg.signals).filter(k => iceberg.signals[k].detected).join(', ')}`);
-      console.log(`  Regime: ${potential.regime}`);
-      console.log(`  Weights: GEX=${(potential.weights.gex*100).toFixed(0)}% Iceberg=${(potential.weights.iceberg*100).toFixed(0)}% Liquidity=${(potential.weights.liquidity*100).toFixed(0)}%`);
+      // console.log(`[IcebergDetector] 🧊 Iceberg detected!`);
+      // console.log(`  Confidence: ${iceberg.confidence}`);
+      // console.log(`  Score: ${(iceberg.score * 100).toFixed(0)}%`);
+      // console.log(`  Estimated hidden: ${iceberg.estimatedHiddenSize?.hidden?.toFixed(1)} BTC`);
+      // console.log(`  Active signals: ${Object.keys(iceberg.signals).filter(k => iceberg.signals[k].detected).join(', ')}`);
+      // console.log(`  Regime: ${potential.regime}`);
+      // console.log(`  Weights: GEX=${(potential.weights.gex*100).toFixed(0)}% Iceberg=${(potential.weights.iceberg*100).toFixed(0)}% Liquidity=${(potential.weights.liquidity*100).toFixed(0)}%`);
     }
     
     return {
@@ -372,16 +373,31 @@ class EscapeTypeDetector extends EventEmitter {
  /**
  * Calculate Iceberg component of Potential using IcebergDetector
  */
-  calculateIcebergComponent(orderBook, recentTrades) {
+  calculateIcebergComponent(orderBook, currentPrice, recentTrades) {
     // ADICIONAR LOG:
     //console.log('[IcebergDetector] 🔍 Checking iceberg:');
     //console.log('  OrderBook:', orderBook ? 'Available' : 'Missing');
     //console.log('  RecentTrades:', recentTrades ? `Available (${recentTrades.length} trades)` : 'Missing');
     
-    if (!orderBook) {
-      return { value: 0, detected: false, confidence: 'NONE' };
+    if (!orderBook || !orderBook.bids || !orderBook.asks) {
+      console.log('[EscapeTypeDetector] ⚠️ OrderBook data missing or incomplete');
+      return {
+         value: 0, 
+         detected: false,
+         confidence: 'NONE',
+         score: 0,
+         estimatedHiddenSize: {visible: 0, hidden: 0, total: 0, multiplier: 1},
+         signals: {},
+         details: {activeSignals: [], totalScore: 0, signalCount: 0}
+        };
     }
-    
+
+    // // ADICIONAR LOG:
+    // console.log('[EscapeTypeDetector] 📊 OrderBook data:');
+    // console.log('  bids:', orderBook.bids?.length || 0);
+    // console.log('  asks:', orderBook.asks?.length || 0);
+
+        
     // Run iceberg detection
     const detection = this.icebergDetector.detect(orderBook, recentTrades);
     
