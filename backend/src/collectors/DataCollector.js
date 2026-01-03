@@ -665,11 +665,23 @@ class DataCollector extends EventEmitter {
  * Obter métricas do OrderBookAnalyzer
  */
   getOrderBookMetrics() {
-    if (!this.orderBookAnalyzer) {
-      return null;
-    }
-    return this.orderBookAnalyzer.getMetrics();
+    const metrics = this.orderBookAnalyzer.getMetrics();
+
+    // // ADICIONAR LOG:
+    // console.log('[DataCollector] 📊 OrderBook metrics:');
+    // console.log('  BI:', metrics.BI);
+    // console.log('  depth:', metrics.depth);
+    // console.log('  bids:', metrics.bids?.length || 0);  // ← VERIFICAR!
+    // console.log('  asks:', metrics.asks?.length || 0);  // ← VERIFICAR!
+
+    return metrics;
+
   }
+    // if (!this.orderBookAnalyzer) {
+    //   return null;
+    // }
+    // return this.orderBookAnalyzer.getMetrics();
+  //}
 
   getOrderBookImbalance() {
     if (!this.orderBookAnalyzer) {
