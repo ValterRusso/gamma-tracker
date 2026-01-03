@@ -63,6 +63,16 @@ class DataCollector extends EventEmitter {
 
     // GEX Calculator
     this.gexCalculator = null;
+
+    // Trades storage
+    this.recentTrades = [];
+    this.maxTradesHistory = 100;
+    this.tradesWS = null;
+
+    // Connect to trades stream
+    this.connectTradesWebSocket();
+
+
   }
 
   /**
@@ -209,17 +219,20 @@ class DataCollector extends EventEmitter {
         this.logger.info(`   ${detection.interpretation}`);
       });
       
-      this.escapeTypeDetector.on('h2_detected', (detection) => {
-        this.logger.warn('⚠️ [escapeTypeDetector] H2 (False Escape) detected!');
-        this.logger.warn(`   ${detection.interpretation}`);
-      });
+      //this.escapeTypeDetector.on('h2_detected', (detection) => {
+       // this.logger.warn('⚠️ [escapeTypeDetector] H2 (False Escape) detected!');
+       // this.logger.warn(`   ${detection.interpretation}`);
+      //});
       
       this.escapeTypeDetector.on('h3_detected', (detection) => {
         this.logger.error('💀 [escapeTypeDetector] H3 (Liquidity Collapse) detected!');
         this.logger.error(`   ${detection.interpretation}`);
       });
       
+      const ALERTS_MUTED = false; // Mudar para false para ativar alertas
+
       this.escapeTypeDetector.on('alert', (alert) => {
+        if (!ALERTS_MUTED) return; // Skip if alerts are muted
         this.logger.warn(`🔔 [escapeTypeDetector] Alert: ${alert.message}`);
       });
 
@@ -739,6 +752,87 @@ class DataCollector extends EventEmitter {
   getEscapeAlerts() {
     if (!this.escapeTypeDetector) return [];
     return this.escapeTypeDetector.getAlerts();
+  }
+
+  /**
+ * Connect to Binance trade stream
+ */
+  connectTradesWebSocket() {
+    const symbol = 'btcusdt';
+    const wsUrl = `wss://stream.binance.com:9443/ws/${symbol}@trade`;
+    
+    console.log(`[DataCollector] 🔌 Connecting to trades WebSocket: ${wsUrl}`);
+    
+    this.tradesWS = new WebSocket(wsUrl);
+    
+    this.tradesWS.on('open', () => {
+      console.log('[DataCollector] ✅ Trades WebSocket connected');
+    });
+    
+    this.tradesWS.on('message', (data) => {
+      try {
+        const trade = JSON.parse(data);
+        
+        this.addTrade({
+          timestamp: trade.T,
+          price: trade.p,
+          size: trade.q,
+          side: trade.m ? 'sell' : 'buy',
+          tradeId: trade.t
+        });
+        
+      } catch (error) {
+        console.error('[DataCollector] ❌ Error processing trade:', error.message);
+      }
+    });
+    
+    this.tradesWS.on('error', (error) => {
+      console.error('[DataCollector] ❌ Trades WebSocket error:', error.message);
+    });
+    
+    this.tradesWS.on('close', () => {
+      console.log('[DataCollector] 🔌 Trades WebSocket closed. Reconnecting in 5s...');
+      setTimeout(() => this.connectTradesWebSocket(), 5000);
+    });
+  }
+
+  /**
+   * Get recent trades
+   */
+  getRecentTrades() {
+    return this.recentTrades;
+  }
+
+  /**
+   * Add trade to history
+   */
+  addTrade(trade) {
+    this.recentTrades.push({
+      timestamp: parseInt(trade.timestamp) || Date.now(),
+      price: parseFloat(trade.price),
+      size: parseFloat(trade.size),
+      side: trade.side,
+      tradeId: trade.tradeId
+    });
+    
+    // Keep last 100 trades
+    if (this.recentTrades.length > this.maxTradesHistory) {
+      this.recentTrades.shift();
+    }
+    
+    // Remove trades older than 5 minutes
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    this.recentTrades = this.recentTrades.filter(t => t.timestamp > fiveMinutesAgo);
+  }
+
+  /**
+   * Disconnect trades WebSocket
+   */
+  disconnectTradesWebSocket() {
+    if (this.tradesWS) {
+      this.tradesWS.close();
+      this.tradesWS = null;
+    }
   }
 
 
