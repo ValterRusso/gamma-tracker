@@ -20,6 +20,7 @@
  */
 
 const EventEmitter = require('events');
+const IcebergDetector = require('./IcebergDetector');
 
 class EscapeTypeDetector extends EventEmitter {
   constructor(dataCollector) {
@@ -48,6 +49,23 @@ class EscapeTypeDetector extends EventEmitter {
       noneCount: 0,
       lastDetectionTime: null
     };
+
+    // Initialize IcebergDetector
+    this.icebergDetector = new IcebergDetector({
+      refillingMinOccurrences: 5,
+      volumeAnomalyRatio: 2.0,
+      rejectionMinCount: 3,
+      regenMinDrop: 0.2,
+      regenMinRecovery: 0.15,
+      consistentSizeMinOccurrences: 5
+
+    });
+
+    // Iceberg detection state
+    this.lastIcebergDetection = null;
+    this.icebergHistory = [];
+
+
     
     // Thresholds (can be tuned based on backtesting)
     this.thresholds = {
@@ -117,6 +135,8 @@ class EscapeTypeDetector extends EventEmitter {
       
       // 7. Generate alerts if needed
       this.checkAlerts(detection);
+
+      
       
       return detection;
       
@@ -131,30 +151,29 @@ class EscapeTypeDetector extends EventEmitter {
    * Collect data from all sources
    */
   collectData() {
+    const data = {}
     const orderBook = this.dataCollector.getOrderBookMetrics ? 
-      this.dataCollector.getOrderBookMetrics() : null;
-    
-    const liquidations = this.dataCollector.getLiquidationMetrics ? 
-      this.dataCollector.getLiquidationMetrics() : null;
+      this.dataCollector.getOrderBookMetrics() : null; 
 
-     // DEBUG: Ver estrutura dos dados
-    // console.log('[EscapeDetector] OrderBook data:', JSON.stringify(orderBook, null, 2));
-    // console.log('[EscapeDetector] Liquidations data:', JSON.stringify(liquidations, null, 2))  
+    const liquidations = this.dataCollector.getLiquidationMetrics ? 
+      this.dataCollector.getLiquidationMetrics() : null;     
     
     const gex = this.dataCollector.getGEX ? 
-      this.dataCollector.getGEX() : null;
-
-     // DEBUG: Ver estrutura do GEX
-    // console.log('[EscapeDetector] GEX data:', JSON.stringify(gex, null, 2));  
+      this.dataCollector.getGEX() : null;   
     
     const currentPrice = this.dataCollector.getCurrentPrice ? 
       this.dataCollector.getCurrentPrice() : null;
+
+    const recentTrades = this.dataCollector.getRecentTrades ?
+      this.dataCollector.getRecentTrades(5 * 60) : null; // Last 5 minutes  
+
     
     return {
       orderBook,
       liquidations,
       gex,
       currentPrice,
+      recentTrades,
       timestamp: new Date().toISOString()
     };
   }
@@ -174,27 +193,47 @@ class EscapeTypeDetector extends EventEmitter {
    * Calculate combined metrics from all sources
    */
   calculateMetrics(data) {
+    const { gex, orderBook, liquidations, currentPrice, recentTrades } = data;
+
+    // 1. Calculate energies
     const sustainedEnergy = this.calculateSustainedEnergy(data.orderBook);
     const injectedEnergy = this.calculateInjectedEnergy(data.liquidations);
     const totalEnergy = (sustainedEnergy + injectedEnergy) / 2;
 
-    // DEBUG: Ver o que está chegando
-    //console.log('[EscapeDetector] calculateMetrics - GEX:', {
-    //hasGEX: !!data.gex,
-    //gexKeys: data.gex ? Object.keys(data.gex) : null,
-    //totalGEX: data.gex?.totalGEX,
-    //putWall: data.gex?.putWall,
-    //callWall: data.gex?.callWall,
-    //currentPrice: data.currentPrice
-    // });
     
-    const potential = this.calculatePotential(data.gex, data.currentPrice);
+    // 2. Calculate potential
+    const potential = this.calculatePotential(
+      gex,
+      orderBook,
+      currentPrice,
+      recentTrades || null
+    );
     
+    // 3. Calculate escape probability
+    const P_escape = potential.total > 0 ? totalEnergy / potential.total : 0;
+    
+    // 4. Determine direction and nearest wall
+    const direction = this.determineDirection(orderBook, gex);
+    const wallInfo = this.getNearestWall(gex, currentPrice, direction);
 
-    const P_escape = this.calculateEscapeProbability(totalEnergy, potential);
-    
-    const direction = this.determineDirection(data.orderBook, data.liquidations);
-    const wallInfo = this.getNearestWall(data.gex, data.currentPrice, direction);
+    // 5. Log intermediate metrics
+    // console.log('[IcebergDetector] 📊 Detection attempt:');
+    // console.log('  Score:', potential.components?.iceberg?.score || 0);
+    // console.log('  Detected:', potential.components?.iceberg?.detected || false);
+    // console.log('  Regime:', potential.regime);
+
+
+    // 6. Log iceberg details if detected
+    if (potential.components?.iceberg?.detected) {
+      const iceberg = potential.components.iceberg;
+      console.log(`[IcebergDetector] 🧊 Iceberg detected!`);
+      console.log(`  Confidence: ${iceberg.confidence}`);
+      console.log(`  Score: ${(iceberg.score * 100).toFixed(0)}%`);
+      console.log(`  Estimated hidden: ${iceberg.estimatedHiddenSize?.hidden?.toFixed(1)} BTC`);
+      console.log(`  Active signals: ${Object.keys(iceberg.signals).filter(k => iceberg.signals[k].detected).join(', ')}`);
+      console.log(`  Regime: ${potential.regime}`);
+      console.log(`  Weights: GEX=${(potential.weights.gex*100).toFixed(0)}% Iceberg=${(potential.weights.iceberg*100).toFixed(0)}% Liquidity=${(potential.weights.liquidity*100).toFixed(0)}%`);
+    }
     
     return {
       sustainedEnergy,
@@ -245,28 +284,65 @@ class EscapeTypeDetector extends EventEmitter {
   /**
    * Calculate potential from GEX
    */
-  calculatePotential(gex, currentPrice) {
+  calculatePotential(gex, orderBook, currentPrice, recentTrades = null) {
     if (!gex || !currentPrice) {
       
-      return 0.5; // Default medium potential
+       return { total: 0.5, components: {}, regime: 'UNKNOWN'}; // Default medium potential
     }
-    
-    // GEX magnitude component (normalized to 0-1)
-     // Handle both number and object formats
-     const totalGEXValue = typeof gex.totalGEX === 'object' 
-    ? Math.abs(gex.totalGEX.total || 0)  // ✅ Pega .total se for objeto
-    : Math.abs(gex.totalGEX || 0);        // ✅ Usa direto se for número
 
-    const gexMagnitude = totalGEXValue / 1e9; // Billions
-    const gexComponent = Math.min(1, gexMagnitude / 0.5); // Cap at $500M
+    // 1. Calculate individual components
+    const gexComponent = this.calculateGEXComponent(gex, currentPrice);
+    const icebergComponent = this.calculateIcebergComponent(orderBook, recentTrades);
+    const liquidityComponent = this.calculateLiquidityComponent(orderBook);
 
-    // Wall strength component
+    // 2. Detect market regime
+    const regime = this.detectMarketRegime(gex, orderBook, icebergComponent);
+
+    // 3. Determine adaptive weights based on regime
+    const weights = this.getAdaptiveWeights(regime, gexComponent, icebergComponent);
+
+    // 4. Combine components with adaptive weights
+    const potential = (
+      gexComponent.value * weights.gex +
+      icebergComponent.value * weights.iceberg +
+      liquidityComponent.value * weights.liquidity
+    );
+
+     // 5. Apply floor (higher in uncertain regimes)
+      const floor = regime === 'OPTIONS_INACTIVE' ? 0.4 : 0.3;
+      const finalPotential = Math.max(floor, Math.min(1, potential));
+      
+      return {
+        total: finalPotential,
+        components: {
+          gex: gexComponent,
+          iceberg: icebergComponent,
+          liquidity: liquidityComponent
+        },
+        weights: weights,
+        regime: regime,
+        floor: floor
+      };
+  }
+
+  /**
+ * Calculate GEX component of Potential
+ */    
+ calculateGEXComponent(gex, currentPrice) {
+    const totalGEXValue = typeof gex.totalGEX === 'object' 
+      ? Math.abs(gex.totalGEX.total || 0)  // ✅ Pega .total se for objeto
+      : Math.abs(gex.totalGEX || 0);        // ✅ Usa direto se for número
+
+    // GEX magnitude (normalized to billions)
+    const gexMagnitude = totalGEXValue / 1e9;
+    const gexNormalized = Math.min(1, gexMagnitude / 0.5); // $500M = 1.0
+
+    // Wall strength
     const putWallGEX = Math.abs(gex.putWall?.gex || 0);
     const callWallGEX = Math.abs(gex.callWall?.gex || 0);
-
-    // Use the stronger wall
     const strongerWallGEX = Math.max(putWallGEX, callWallGEX);
-    const wallStrength = Math.min(1, strongerWallGEX / 1e9); // Normalize
+    const wallStrength = Math.min(1, strongerWallGEX / 1e9);   
+  
 
     // Wall proximity component
     const putWallDistance = gex.putWall?.distancePercent || 1;
@@ -275,30 +351,179 @@ class EscapeTypeDetector extends EventEmitter {
     // Use the closer wall
     const closerWallDistance = Math.min(putWallDistance, callWallDistance);
     const wallProximity = Math.max(0, 1 - closerWallDistance); // Closer = higher score
-    
-    // Wall strength component
-    // const putWall = gex.putWall || {};
-    // const callWall = gex.callWall || {};
-    // const maxWallStrength = Math.max(
-    //  putWall.strength || 0,
-    //  callWall.strength || 0
-    // );
-    
-    // Wall proximity component (closer = higher potential)
-    //const putDistance = putWall.strike ? 
-    //  Math.abs(currentPrice - putWall.strike) / currentPrice : 1;
-    //const callDistance = callWall.strike ? 
-   //   Math.abs(currentPrice - callWall.strike) / currentPrice : 1;
-    //const minDistance = Math.min(putDistance, callDistance);
-    //const proximityComponent = Math.max(0, 1 - (minDistance / 0.1)); // Within 10%
-    
-    const potential = (
-      gexComponent * 0.6 +
+
+    // Combine
+    const value = (
+      gexNormalized * 0.6 +
       wallStrength * 0.3 +
       wallProximity * 0.1
     );
     
-    return Math.max(0, Math.min(1, potential)); // Min 0.1 to avoid division by zero
+    return {
+    value: Math.max(0, Math.min(1, value)),
+    gexMagnitude: gexMagnitude,
+    wallStrength: wallStrength,
+    wallProximity: wallProximity,
+    totalGEX: totalGEXValue
+  }; 
+    
+ }
+
+ /**
+ * Calculate Iceberg component of Potential using IcebergDetector
+ */
+  calculateIcebergComponent(orderBook, recentTrades) {
+    // ADICIONAR LOG:
+    //console.log('[IcebergDetector] 🔍 Checking iceberg:');
+    //console.log('  OrderBook:', orderBook ? 'Available' : 'Missing');
+    //console.log('  RecentTrades:', recentTrades ? `Available (${recentTrades.length} trades)` : 'Missing');
+    
+    if (!orderBook) {
+      return { value: 0, detected: false, confidence: 'NONE' };
+    }
+    
+    // Run iceberg detection
+    const detection = this.icebergDetector.detect(orderBook, recentTrades);
+    
+    // Store last detection
+    this.lastIcebergDetection = detection;
+    
+    // Add to history
+    this.icebergHistory.push({
+      timestamp: detection.timestamp,
+      score: detection.score,
+      confidence: detection.confidence
+    });
+    
+    // Keep last 100 detections
+    if (this.icebergHistory.length > 100) {
+      this.icebergHistory.shift();
+    }
+    
+    // Convert detection score to potential component
+    // Higher iceberg score = higher resistance
+    const value = detection.score;
+    
+    return {
+      value: value,
+      detected: detection.detected,
+      confidence: detection.confidence,
+      score: detection.score,
+      estimatedHiddenSize: detection.estimatedHiddenSize,
+      signals: detection.signals,
+      details: detection.details
+    };
+  }
+
+  /**
+ * Calculate Liquidity component of Potential from order book
+ */
+  calculateLiquidityComponent(orderBook) {
+    if (!orderBook) {
+      return { value: 0.5 };
+    }
+    
+    // Depth (total liquidity)
+    const depth = orderBook.depth || 0;
+    const depthComponent = Math.min(1, depth / 50e6); // $50M = 1.0
+    
+    // Spread (execution cost)
+    const spreadPct = orderBook.spread_pct || 0.01;
+    const spreadComponent = Math.min(1, spreadPct * 1000); // 0.1% = 1.0
+    
+    // Imbalance (asymmetry)
+    const imbalance = Math.abs(orderBook.BI || 0);
+    const imbalanceComponent = 1 - imbalance; // High imbalance = less resistance
+    
+    // Combine
+    const value = (
+      depthComponent * 0.5 +
+      spreadComponent * 0.3 +
+      imbalanceComponent * 0.2
+    );
+    
+    return {
+      value: Math.max(0, Math.min(1, value)),
+      depth: depth,
+      spread: spreadPct,
+      imbalance: imbalance
+    };
+  }
+
+
+
+  /**
+ * Detect market regime (OPTIONS_ACTIVE, OPTIONS_INACTIVE, TRANSITION)
+ */
+  detectMarketRegime(gex, orderBook, icebergComponent) {
+    // Indicators of inactive options market
+    const indicators = {
+      lowGEX: false,
+      lowOptionsVolume: false,
+      highIceberg: false,
+      isWeekend: false,
+      isOffHours: false
+    };
+    
+    // 1. Low GEX
+    const totalGEX = typeof gex.totalGEX === 'object' 
+      ? Math.abs(gex.totalGEX.total || 0)
+      : Math.abs(gex.totalGEX || 0);
+    indicators.lowGEX = totalGEX < 50e6; // < $50M
+    
+    // 2. High iceberg activity
+    indicators.highIceberg = icebergComponent.score > 0.5;
+    
+    // 3. Weekend
+    const now = new Date();
+    const day = now.getUTCDay();
+    indicators.isWeekend = [0, 6].includes(day);
+    
+    // 4. Off-hours (outside 13:00-21:00 UTC = 9am-5pm NY)
+    const hour = now.getUTCHours();
+    indicators.isOffHours = hour < 13 || hour > 21;
+    
+    // Calculate regime score
+    const inactiveScore = Object.values(indicators).filter(x => x).length;
+    
+    // Determine regime
+    if (inactiveScore >= 3) {
+      return 'OPTIONS_INACTIVE';
+    } else if (inactiveScore >= 2) {
+      return 'TRANSITION';
+    } else {
+      return 'OPTIONS_ACTIVE';
+    }
+  }
+
+  /**
+ * Get adaptive weights based on regime
+ */
+  getAdaptiveWeights(regime, gexComponent, icebergComponent) {
+    if (regime === 'OPTIONS_ACTIVE') {
+      // GEX dominates
+      return {
+        gex: 0.60,
+        iceberg: 0.20,
+        liquidity: 0.20
+      };
+      
+    } else if (regime === 'OPTIONS_INACTIVE') {
+      // Icebergs dominate
+      return {
+        gex: 0.10,
+        iceberg: 0.60,
+        liquidity: 0.30
+      };
+      
+    } else {
+      // TRANSITION: balanced
+      return {
+        gex: 0.40,
+        iceberg: 0.40,
+        liquidity: 0.20
+      };
+    }
   }
   
   /**
@@ -696,7 +921,7 @@ class EscapeTypeDetector extends EventEmitter {
       type: 'NONE',
       confidence: 0,
       direction: 'NEUTRAL',
-      timestamp: data.timestamp || new Date().toISOString(),
+      timestamp: new Date().toISOString(),
       interpretation: `No clear escape pattern detected. ${reason}`,
       metrics: metrics || {},
       conditions: {},
@@ -717,15 +942,20 @@ class EscapeTypeDetector extends EventEmitter {
     // Classificar probabilidade
     const probClass = effectiveP > 0.7 ? 'High' : 
                     effectiveP > 0.4 ? 'Medium' : 'Low';
+
+                    
       
     if (type === 'H1') {
-      return `🚀 GOOD ESCAPE detected with ${(confidence * 100).toFixed(0)}% confidence!.${probClass}
-      probability (${(effectiveP *100).toFixed(0)}%) of sustained breakout.`
+      return `🚀 GOOD ESCAPE detected with ${(confidence * 100).toFixed(0)}% confidence. ` +
+     `${probClass} probability (${(effectiveP * 100).toFixed(0)}%) of sustained breakout.` +
+      this.generateIcebergInfo(metrics.potential.tota?.components?.iceberg);
+
     }
     
     if (type === 'H2') {
       return ` FALSE ESCAPE detected with ${(confidence * 100).toFixed(0)}% confidence!. ${probClass}
-      probability (${(effectiveP *100).toFixed(0)}%) of reversal back into the Half Pipe.`
+      probability (${(effectiveP *100).toFixed(0)}%) of reversal back into the Half Pipe.` +
+      this.generateIcebergInfo(metrics.potential.total?.components?.iceberg);
     }
     
     if (type === 'H3') {
@@ -734,11 +964,31 @@ class EscapeTypeDetector extends EventEmitter {
         `Liquidity draining (depth: ${(ob.depth?.depthChange * 100).toFixed(0)}%), ` +
         `spreads widening (quality: ${(ob.spreadQuality?.score * 100).toFixed(0)}%). ` +
         `Very high probability (${(P_escape * 100).toFixed(0)}%) of violent ${direction.toLowerCase()} move. ` +
+        this.generateIcebergInfo(metrics.potential.total?.components?.iceberg) +
         `Stay out or use wide stops!`;
     }
     
     return 'No clear pattern detected.';
   }
+
+  /**
+ * Generate iceberg information string for interpretation
+ */
+  generateIcebergInfo(icebergComponent) {
+    if (!icebergComponent || !icebergComponent.detected) {
+      return '';
+    }
+    
+    const hidden = icebergComponent.estimatedHiddenSize?.hidden || 0;
+    const confidence = icebergComponent.confidence;
+    
+    if (hidden > 50) {
+      return ` Iceberg orders detected (${confidence} confidence, ~${hidden.toFixed(0)} BTC hidden).`;
+    }
+    
+    return '';
+  }
+
   
   /**
    * Update internal state
@@ -836,8 +1086,7 @@ class EscapeTypeDetector extends EventEmitter {
     alerts.forEach(alert => {
       this.activeAlerts.unshift(alert); // Add to front
       this.emit('alert', alert);
-    });
-    
+    });    
     // Trim alerts
     if (this.activeAlerts.length > this.maxAlerts) {
       this.activeAlerts = this.activeAlerts.slice(0, this.maxAlerts);
@@ -885,6 +1134,20 @@ class EscapeTypeDetector extends EventEmitter {
       activeAlerts: this.activeAlerts.length
     };
   }
+
+  /**
+ * Get iceberg detection statistics
+ */
+  getIcebergStats() {
+    return {
+      detector: this.icebergDetector.getStats(),
+      lastDetection: this.lastIcebergDetection,
+      historySize: this.icebergHistory.length,
+      recentDetections: this.icebergHistory.slice(-10)
+    };
+  }
+
+
   
   /**
    * Clear alerts
