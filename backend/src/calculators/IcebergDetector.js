@@ -19,12 +19,13 @@ class IcebergDetector {
   constructor(config = {}) {
     this.config = {
       // Refilling Pattern thresholds
+      refillngTheshold: config.refillngThreshold || 3, // Number of refills to consider
       refillingMinOccurrences: config.refillingMinOccurrences || 5,
       refillingMaxSize: config.refillingMaxSize || 5, // BTC
       refillingMinLevels: config.refillingMinLevels || 3,
       
       // Volume Anomaly thresholds
-      volumeAnomalyRatio: config.volumeAnomalyRatio || 2.0,
+      volumeAnomalyRatio: config.volumeAnomalyRatio || 1.5,// Executed vs Visible volume ratio
       volumeWindowMs: config.volumeWindowMs || 300000, // 5 minutes
       
       // Price Rejection thresholds
@@ -53,7 +54,8 @@ class IcebergDetector {
       maxSnapshotHistory: config.maxSnapshotHistory || 100,
       maxTradeHistory: config.maxTradeHistory || 1000,
       maxPriceHistory: config.maxPriceHistory || 500,
-      maxDepthHistory: config.maxDepthHistory || 100
+      maxDepthHistory: config.maxDepthHistory || 100,
+      minHistoryLength: config.minHistoryLength || 20
     };
     
     // Internal state
@@ -61,6 +63,9 @@ class IcebergDetector {
     this.tradeHistory = [];
     this.priceHistory = [];
     this.depthHistory = [];
+    this.orderBookHistory = [];
+    this.depthHistory = [];
+    this.tradeHistory = [];
     
     // Statistics
     this.stats = {
@@ -78,6 +83,20 @@ class IcebergDetector {
    * @returns {Object} Detection result with score, confidence, and signals
    */
   detect(orderBook, recentTrades = null) {
+    // console.log('[IcebergDetector] 📥 INPUT:');
+    // console.log('  orderBook:', orderBook ? 'YES' : 'NO');
+    // console.log('  orderBook.bids:', orderBook?.bids?.length || 0);
+    // console.log('  orderBook.asks:', orderBook?.asks?.length || 0);
+    // console.log('  recentTrades:', recentTrades ? 'YES' : 'NO');
+    // console.log('  recentTrades.length:', recentTrades?.length || 0);
+
+    //  // LOG DE HISTÓRICO
+    // console.log('[IcebergDetector] 📚 HISTORY:');
+    // console.log('  orderBookHistory:', this.orderBookHistory.length);
+    // console.log('  priceHistory:', this.priceHistory.length);
+    // console.log('  depthHistory:', this.depthHistory.length);
+
+
     // Update history
     this.updateHistory(orderBook, recentTrades);
     
