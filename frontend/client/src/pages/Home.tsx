@@ -158,6 +158,13 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <Link href="/strategy-center">
+                <button className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors">
+                  <Target className="w-4 h-4" />
+                  <span className="font-medium">Strategy Center</span>
+                  <span className="px-2 py-0.5 bg-emerald-500 text-xs font-semibold rounded">NEW</span>
+                </button>
+              </Link>
               <Link href="/half-pipe">
                 <button className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
                   <BarChart3 className="w-4 h-4" />
