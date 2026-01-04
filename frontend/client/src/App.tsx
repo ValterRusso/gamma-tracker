@@ -9,6 +9,7 @@ import VolatilitySurface from "./pages/VolatilitySurface";
 import VolatilitySkew from "./pages/VolatilitySkew";
 import Anomalies from "./pages/Anomalies";
 import HalfPipe  from "./pages/HalfPipe";
+import StrategyCenter from "./pages/StrategyCenter";
 
 
 
@@ -19,7 +20,8 @@ function Router() {
       <Route path={"/volatility-surface"} component={VolatilitySurface} />
       <Route path="/volatility-skew" component={VolatilitySkew} />
       <Route path="/anomalies" component={Anomalies} />
-      <Route path="/half-pipe" component={HalfPipe} />      
+      <Route path="/half-pipe" component={HalfPipe} /> 
+      <Route path="/strategy-center" component={StrategyCenter} />     
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
