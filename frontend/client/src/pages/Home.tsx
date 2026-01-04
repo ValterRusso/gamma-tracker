@@ -158,6 +158,12 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <Link href="/half-pipe">
+                <button className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
+                  <BarChart3 className="w-4 h-4" />
+                  <span className="font-medium">Half Pipe</span>
+                </button>
+              </Link>
               <Link href="/volatility-surface">
                 <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
                   <Mountain className="w-4 h-4" />
