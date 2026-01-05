@@ -9,6 +9,7 @@ const GEXCalculator = require('./calculators/GEXCalculator');
 const RegimeAnalyzer = require('./calculators/RegimeAnalyzer');
 const MaxPainCalculator = require('./calculators/MaxPainCalculator');
 const SentimentAnalyzer = require('./calculators/SentimentAnalyzer');
+const OrderBookAnalyzer = require('./collectors/OrderBookAnalyzer');
 const APIServer = require('./api/server');
 const Logger = require('./utils/logger');
 
@@ -70,6 +71,11 @@ class GammaTracker {
       this.dataCollector = new DataCollector({
         underlying: this.config.underlying
       });
+      this.dataCollector.orderBookAnalyzer = new OrderBookAnalyzer(
+        `${this.config.underlying}USDT`,
+        this.logger
+
+      );
       
       // Configurar event listeners
       this.setupEventListeners();
