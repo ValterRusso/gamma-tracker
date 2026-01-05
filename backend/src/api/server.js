@@ -74,6 +74,8 @@ const SentimentAnalyzer = require('../calculators/SentimentAnalyzer');
 const { STRATEGIES } = require('../recommender/strategies');
 const MarketStateAnalyzer = require('../recommender/MarketStateAnalyzer');
 const StrategyRecommender = require('../recommender/StrategyRecommender');
+const EntropyCalculator = require('../calculators/EntropyCalculator');
+const RSICalculator = require('../calculators/RSICalculator');
 const { Op } = require('sequelize');
 
 
@@ -94,6 +96,18 @@ class APIServer {
 
     this.logger = new Logger('APIServer');
     this.anomalyDetector = new VolatilityAnomalyDetector(this.logger);
+
+    this.entropyCalculator = new EntropyCalculator(this.logger);
+    this.rsiCalculator = new RSICalculator(this.logger, {
+      symbol: 'BTCUSDT',
+      interval: '15m',
+      period: 14,
+      updateInterval: 90000 // segundos
+
+    });
+
+    this.rsiCalculator.start();
+
     this.app = express();
     this.server = null;
 
@@ -2615,7 +2629,115 @@ this.app.get('/api/orderbook/history', async (req, res) => {
         error: error.message
       });
     }
-  }); 
+  });
+  
+  // ========================================
+  // ENTROPY - Shannon Entropy Analysis
+  // ========================================
+
+  // Métricas de entropia atuais
+  this.app.get('/api/entropy', (req, res) => {
+    try {
+      const metrics = this.entropyCalculator.getMetrics();
+      const rsiMetrics = this.rsiCalculator.getMetrics();
+      
+      res.json({
+        success: true,
+        data: {
+          entropy: metrics,
+          rsi: rsiMetrics
+        }
+      });
+    } catch (error) {
+      this.logger.error('Erro ao obter entropia', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Histórico de entropia
+  this.app.get('/api/entropy/history', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 1000;
+      const history = this.entropyCalculator.getHistory(limit);
+      
+      res.json({
+        success: true,
+        data: history
+      });
+    } catch (error) {
+      this.logger.error('Erro ao obter histórico de entropia', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Eventos de entropia recentes
+  this.app.get('/api/entropy/events', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 10;
+      const type = req.query.type || null;
+      
+      const events = this.entropyCalculator.getRecentEvents(limit, type);
+      
+      res.json({
+        success: true,
+        data: events
+      });
+    } catch (error) {
+      this.logger.error('Erro ao obter eventos de entropia', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Divergências de RSI
+  this.app.get('/api/entropy/divergence', (req, res) => {
+    try {
+      const windowMs = parseInt(req.query.window) || 900000; // 15 min default
+      const divergence = this.rsiCalculator.detectDivergence(windowMs);
+      
+      res.json({
+        success: true,
+        data: divergence
+      });
+    } catch (error) {
+      this.logger.error('Erro ao detectar divergência', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Stats de entropia
+  this.app.get('/api/entropy/stats', (req, res) => {
+    try {
+      const entropyStats = this.entropyCalculator.getStats();
+      const rsiStats = this.rsiCalculator.getStats();
+      
+      res.json({
+        success: true,
+        data: {
+          entropy: entropyStats,
+          rsi: rsiStats
+        }
+      });
+    } catch (error) {
+      this.logger.error('Erro ao obter stats de entropia', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
 
 
 
@@ -2852,7 +2974,11 @@ this.app.get('/api/orderbook/history', async (req, res) => {
   /**
    * Inicia o servidor
    */
-  start() {
+  async start() {
+    // connect to OrderBookAnalyzer updates if available
+    if (this.dataCollector.orderBookAnalyzer) {
+      this.setupEntropyUpdates();
+    }
     return new Promise((resolve, reject) => {
       try {
         this.server = this.app.listen(this.config.port, this.config.host, () => {
@@ -2865,6 +2991,33 @@ this.app.get('/api/orderbook/history', async (req, res) => {
       }
     });
   }
+
+  /**
+ * Configurar updates de entropia
+ */
+  setupEntropyUpdates() {
+    const orderBook = this.dataCollector.orderBookAnalyzer;
+    
+    // Escutar updates do order book
+    orderBook.on('update', (metrics) => {
+      try {
+        // Calcular entropia
+        const entropyData = this.entropyCalculator.calculate(
+          orderBook.bids,
+          orderBook.asks
+        );       
+       
+        
+      } catch (error) {
+        this.logger.error('Erro ao calcular entropia:', error);
+      }
+    });
+    
+    this.logger.success('✓ Entropy updates conectados ao OrderBookAnalyzer');
+  } 
+
+
+
 
   /**
    * Para o servidor
