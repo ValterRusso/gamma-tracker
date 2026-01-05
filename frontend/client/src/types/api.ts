@@ -1,9 +1,11 @@
 // ============================================================================
-// API TYPES - Gamma Tracker Frontend
+// API TYPES - CONSOLIDATED (NO DUPLICATES)
+// Gamma Tracker Frontend - Complete Type Definitions
+// Este arquivo vai para: src/types/api.ts
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// Common Types
+// Common Types (Used across multiple domains)
 // ----------------------------------------------------------------------------
 
 export interface ApiResponse<T> {
@@ -18,6 +20,10 @@ export interface ApiMetaInfo {
   spotPrice?: number;
   regime?: string;
 }
+
+// SHARED ENUMS (declared once, used everywhere)
+export type VolatilityLevel = 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+export type ImbalanceDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 
 // ----------------------------------------------------------------------------
 // Strategy Types
@@ -126,7 +132,6 @@ export type RegimeType =
   | 'BULLISH'
   | 'BEARISH';
 
-export type VolatilityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 export type SkewType = 'FLAT' | 'PUT_SKEW' | 'CALL_SKEW';
 export type GEXType = 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
 
@@ -376,6 +381,441 @@ export interface RegimeChange {
   spot_price: number;
   total_gex: number;
   confidence: number;
+}
+
+// ----------------------------------------------------------------------------
+// Liquidation Types
+// ----------------------------------------------------------------------------
+
+export type LiquidationSide = 'BUY' | 'SELL';
+export type LiquidationStatus = 'FILLED' | 'PARTIAL' | 'CANCELLED';
+export type LiquidationSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'MASSIVE';
+export type LiquidationEnergyLevel = 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH' | 'EXTREME';
+
+export interface LiquidationRaw {
+  s: string;
+  S: string;
+  o: string;
+  f: string;
+  q: string;
+  p: string;
+  ap: string;
+  X: string;
+  l: string;
+  z: string;
+  T: number;
+}
+
+export interface Liquidation {
+  timestamp: number;
+  symbol: string;
+  side: LiquidationSide;
+  quantity: number;
+  price: number;
+  value: number;
+  status: LiquidationStatus;
+  raw: LiquidationRaw;
+  size: LiquidationSize;
+}
+
+export interface LiquidationImbalance {
+  longLiquidated: number;
+  shortLiquidated: number;
+  ratio: number;
+  direction: ImbalanceDirection;  // Reusing shared type
+}
+
+export interface LiquidationCount {
+  last1h: number;
+  last4h: number;
+  last24h: number;
+}
+
+export interface LiquidationTotalValue {
+  last1h: number;
+  last4h: number;
+  last24h: number;
+}
+
+export interface CascadeDetectionData {
+  cascadeDetected: boolean;
+  liquidationsLastMinute: number;
+  threshold: number;
+  recentLiquidations: Liquidation[];
+}
+
+export interface CascadeDetectionResponse {
+  success: boolean;
+  data: CascadeDetectionData;
+  timestamp: string;
+}
+
+export interface LiquidationStats {
+  totalValue: LiquidationTotalValue;
+  imbalance1h: LiquidationImbalance;
+  cascade: boolean;
+  largestLiquidation: Liquidation;
+  count: LiquidationCount;
+  lastUpdate: number;
+}
+
+export interface LiquidationStatsResponse {
+  success: boolean;
+  data: LiquidationStats;
+  timestamp: string;
+}
+
+export interface LiquidationEnergyComponents {
+  value: number;
+  frequency: number;
+  cascade: number;
+  imbalance: number;
+}
+
+export interface LiquidationEnergyData {
+  score: number;
+  level: LiquidationEnergyLevel;
+  direction: ImbalanceDirection;  // Reusing shared type
+  components: LiquidationEnergyComponents;
+  rawData: LiquidationStats;
+}
+
+export interface LiquidationEnergyResponse {
+  success: boolean;
+  data: LiquidationEnergyData;
+  timestamp: string;
+}
+
+export interface LiquidationSummaryData {
+  stats: LiquidationStats;
+  energy: LiquidationEnergyData;
+  connected: boolean;
+  lastUpdate: number;
+}
+
+export interface LiquidationSummaryResponse {
+  success: boolean;
+  data: LiquidationSummaryData;
+}
+
+// ----------------------------------------------------------------------------
+// Orderbook Types
+// ----------------------------------------------------------------------------
+
+export type SpreadQuality = 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR' | 'TERRIBLE';
+export type ImbalanceStrength = 'VERY_WEAK' | 'WEAK' | 'MODERATE' | 'STRONG' | 'VERY_STRONG';
+export type WallSignificance = 'NEGLIGIBLE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH' | 'EXTREME';
+export type BookEnergyLevel = 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+
+export interface SpreadInterpretation {
+  quality: SpreadQuality;
+  message: string;
+  volatility: VolatilityLevel;  // Reusing shared type
+}
+
+export interface OrderbookSpreadData {
+  spread: number;
+  spread_pct: number;
+  pulse: number;
+  bestBid: number;
+  bestAsk: number;
+  interpretation: SpreadInterpretation;
+}
+
+export interface OrderbookSpreadResponse {
+  success: boolean;
+  data: OrderbookSpreadData;
+  timestamp: string;
+}
+
+export interface OrderbookDepthResponse extends OrderbookSpreadResponse {}
+
+export interface ImbalanceInterpretation {
+  message: string;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  recommendation: string;
+}
+
+export interface OrderbookImbalanceData {
+  BI: number;
+  direction: ImbalanceDirection;  // Reusing shared type
+  strength: ImbalanceStrength;
+  persistence: number;
+  avg_60s: number;
+  interpretation: ImbalanceInterpretation;
+}
+
+export interface OrderbookImbalanceResponse {
+  success: boolean;
+  data: OrderbookImbalanceData;
+  timestamp: string;
+}
+
+export interface OrderbookWall {
+  price: number;
+  size: number;
+  ratio: number;
+  distance: number;
+}
+
+export interface WallsInterpretation {
+  message: string;
+  significance: WallSignificance;
+}
+
+export interface OrderbookWallsData {
+  bidWall: OrderbookWall;
+  askWall: OrderbookWall;
+  interpretation: WallsInterpretation;
+}
+
+export interface OrderbookWallsResponse {
+  success: boolean;
+  data: OrderbookWallsData;
+  timestamp: string;
+}
+
+export interface BookEnergyComponents {
+  BI: number;
+  persistence: number;
+  spread_quality: number;
+  depth: number;
+}
+
+export interface BookEnergyInterpretation {
+  message: string;
+  recommendation: string;
+}
+
+export interface OrderbookEnergyData {
+  score: number;
+  level: BookEnergyLevel;
+  components: BookEnergyComponents;
+  interpretation: BookEnergyInterpretation;
+}
+
+export interface OrderbookEnergyResponse {
+  success: boolean;
+  data: OrderbookEnergyData;
+  timestamp: string;
+}
+
+// ----------------------------------------------------------------------------
+// Escape Detection Types
+// ----------------------------------------------------------------------------
+
+export type EscapeType = 'NONE' | 'UPWARD' | 'DOWNWARD' | 'VACUUM_UP' | 'VACUUM_DOWN';
+export type EscapeDirection = ImbalanceDirection;  // Reusing shared type
+export type EscapeProbability = 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH' | 'EXTREME';
+export type EscapeRegime = 'FULL_MARKET' | 'BOOK_DOMINANT' | 'OPTIONS_DOMINANT' | 'TRANSITION' | 'LOW_LIQUIDITY';
+export type IcebergConfidence = 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+
+export interface IcebergLevel {
+  price: number;
+  avgSize: number;
+  occurrences: number;
+}
+
+export interface IcebergRefillingSignal {
+  detected: boolean;
+  refillingLevels: number;
+  detectedLevels: IcebergLevel[];
+  score: number;
+}
+
+export interface IcebergVolumeAnomalySignal {
+  detected: boolean;
+  reason?: string;
+}
+
+export interface IcebergPriceRejectionSignal {
+  detected: boolean;
+  rejectionLevels: any[];
+  strongestLevel: any;
+  score: number;
+}
+
+export interface IcebergDepthRegenerationSignal {
+  detected: boolean;
+  reason?: string;
+}
+
+export interface ConsistentSizeEntry {
+  size: number;
+  occurrences: number;
+}
+
+export interface IcebergConsistentSizeSignal {
+  detected: boolean;
+  consistentSizes: ConsistentSizeEntry[];
+  mostCommonSize: ConsistentSizeEntry;
+  score: number;
+}
+
+export interface IcebergSignals {
+  refillingOrders: IcebergRefillingSignal;
+  volumeAnomaly: IcebergVolumeAnomalySignal;
+  priceRejection: IcebergPriceRejectionSignal;
+  depthRegeneration: IcebergDepthRegenerationSignal;
+  consistentSize: IcebergConsistentSizeSignal;
+}
+
+export interface IcebergEstimatedSize {
+  visible: number;
+  hidden: number;
+  total: number;
+  multiplier: number;
+}
+
+export interface IcebergActiveSignal {
+  name: string;
+  score: number;
+  weight: number;
+}
+
+export interface IcebergWeightedContribution {
+  signal: string;
+  contribution: string;
+}
+
+export interface IcebergDetails {
+  activeSignals: IcebergActiveSignal[];
+  totalScore: number;
+  signalCount: number;
+  weightedContributions: IcebergWeightedContribution[];
+}
+
+export interface IcebergComponent {
+  value: number;
+  detected: boolean;
+  confidence: IcebergConfidence;
+  score: number;
+  estimatedHiddenSize: IcebergEstimatedSize;
+  signals: IcebergSignals;
+  details: IcebergDetails;
+}
+
+export interface GEXComponent {
+  value: number;
+  gexMagnitude: number;
+  wallStrength: number;
+  wallProximity: number;
+  totalGEX: number;
+}
+
+export interface LiquidityComponent {
+  value: number;
+  depth: number;
+  spread: number;
+  imbalance: number;
+}
+
+export interface BarrierComponents {
+  gex: GEXComponent;
+  iceberg: IcebergComponent;
+  liquidity: LiquidityComponent;
+}
+
+export interface BarrierWeights {
+  gex: number;
+  iceberg: number;
+  liquidity: number;
+}
+
+export interface PotentialBarrier {
+  total: number;
+  components: BarrierComponents;
+  weights: BarrierWeights;
+  regime: EscapeRegime;
+  floor: number;
+}
+
+export interface WallInfo {
+  type: 'call' | 'put';
+  strike: number;
+  strength: number;
+  distance: number;
+  distanceAbs: number;
+}
+
+export interface SustainedEnergyComponents {
+  bookImbalance: number;
+  biPersistence: number;
+  spreadQuality: number;
+  depthComponent: number;
+}
+
+export interface SustainedEnergy {
+  score: number;
+  components: SustainedEnergyComponents;
+}
+
+export interface InjectedEnergy {
+  score: number;
+  volume5min: number;
+  cascadeDetected: boolean;
+  dominantSide: ImbalanceDirection;  // Reusing shared type
+}
+
+export interface EscapeEnergyData {
+  sustained: SustainedEnergy;
+  injected: InjectedEnergy;
+  total: number;
+  classification: BookEnergyLevel;
+}
+
+export interface EscapeEnergyResponse {
+  success: boolean;
+  timestamp: string;
+  energy: EscapeEnergyData;
+}
+
+export interface EscapeProbabilityComponents {
+  sustainedEnergy: number;
+  injectedEnergy: number;
+  totalEnergy: number;
+  potential: PotentialBarrier;
+}
+
+export interface EscapeProbabilityData {
+  P_escape: number;
+  classification: EscapeProbability;
+  components: EscapeProbabilityComponents;
+  interpretation: string;
+}
+
+export interface EscapeProbabilityResponse {
+  success: boolean;
+  timestamp: string;
+  probability: EscapeProbabilityData;
+}
+
+export interface EscapeMetrics {
+  sustainedEnergy: number;
+  injectedEnergy: number;
+  totalEnergy: number;
+  potential: PotentialBarrier;
+  P_escape: number;
+  direction: EscapeDirection;
+  wallInfo: WallInfo;
+}
+
+export interface EscapeDetectionData {
+  type: EscapeType;
+  confidence: number;
+  direction: EscapeDirection;
+  timestamp: string;
+  interpretation: string;
+  metrics: EscapeMetrics;
+  conditions: Record<string, any>;
+  wallInfo: WallInfo | null;
+  rawData: Record<string, any>;
+}
+
+export interface EscapeDetectionResponse {
+  success: boolean;
+  timestamp: string;
+  detection: EscapeDetectionData;
 }
 
 // ----------------------------------------------------------------------------
