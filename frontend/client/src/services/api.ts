@@ -15,8 +15,20 @@ import type {
   VolSurfaceResponse,
   MarketSnapshot,
   GEXHistoryPoint,
-  RegimeChange
-} from './types';
+  RegimeChange,
+  CascadeDetectionResponse,
+  LiquidationStatsResponse,
+  LiquidationEnergyResponse,
+  LiquidationSummaryResponse,
+  OrderbookSpreadResponse,
+  OrderbookDepthResponse,
+  OrderbookImbalanceResponse,
+  OrderbookWallsResponse,
+  OrderbookEnergyResponse,
+  EscapeEnergyResponse,
+  EscapeProbabilityResponse,
+  EscapeDetectionResponse
+} from '../types/api'
 
 // ----------------------------------------------------------------------------
 // Base API Client
@@ -192,6 +204,110 @@ export const marketApi = {
 };
 
 // ----------------------------------------------------------------------------
+// Liquidations API
+// Adicione este objeto ao gammaTrackerApi no final do arquivo
+// ----------------------------------------------------------------------------
+
+export const liquidationsApi = {
+  /**
+   * Detect liquidation cascade events
+   * Returns cascade status and recent liquidations
+   */
+  getCascade: () => 
+    api.get<CascadeDetectionResponse>('/liquidations/cascade'),
+  
+  /**
+   * Get liquidation statistics
+   * Includes total value, imbalance, counts for 1h/4h/24h
+   */
+  getStats: () => 
+    api.get<LiquidationStatsResponse>('/liquidations/stats'),
+  
+  /**
+   * Get liquidation energy metric
+   * Combined score of value, frequency, cascade and imbalance
+   */
+  getEnergy: () => 
+    api.get<LiquidationEnergyResponse>('/liquidations/energy'),
+  
+  /**
+   * Get complete liquidation summary
+   * Includes stats + energy + connection status
+   */
+  getSummary: () => 
+    api.get<LiquidationSummaryResponse>('/liquidations/summary')
+};
+
+// ----------------------------------------------------------------------------
+// Orderbook API
+// ----------------------------------------------------------------------------
+
+export const orderbookApi = {
+  /**
+   * Get current orderbook spread
+   * Returns bid-ask spread in absolute and percentage terms
+   */
+  getSpread: () => 
+    api.get<OrderbookSpreadResponse>('/orderbook/spread'),
+  
+  /**
+   * Get orderbook depth analysis
+   * Same as spread but focused on depth interpretation
+   */
+  getDepth: () => 
+    api.get<OrderbookDepthResponse>('/orderbook/depth'),
+  
+  /**
+   * Get orderbook imbalance (BI)
+   * Ratio of bid vs ask volume, indicates directional pressure
+   */
+  getImbalance: () => 
+    api.get<OrderbookImbalanceResponse>('/orderbook/imbalance'),
+  
+  /**
+   * Detect orderbook walls
+   * Identifies significant bid/ask walls (large orders)
+   */
+  getWalls: () => 
+    api.get<OrderbookWallsResponse>('/orderbook/walls'),
+  
+  /**
+   * Get orderbook energy metric
+   * Combined score of imbalance, persistence, spread and depth
+   */
+  getEnergy: () => 
+    api.get<OrderbookEnergyResponse>('/orderbook/energy')
+};
+
+// ----------------------------------------------------------------------------
+// Escape Detection API
+// ----------------------------------------------------------------------------
+
+export const escapeApi = {
+  /**
+   * Get escape energy analysis
+   * Sustained (orderbook) + Injected (liquidations) energy
+   */
+  getEnergy: () => 
+    api.get<EscapeEnergyResponse>('/escape/energy'),
+  
+  /**
+   * Calculate escape probability
+   * P(escape) = f(energy, potential_barriers)
+   */
+  getProbability: () => 
+    api.get<EscapeProbabilityResponse>('/escape/probability'),
+  
+  /**
+   * Detect active escape events
+   * Real-time detection of breakout/breakdown with confidence
+   */
+  detect: () => 
+    api.get<EscapeDetectionResponse>('/escape/detect')
+};
+
+
+// ----------------------------------------------------------------------------
 // Database API (Historical Data)
 // ----------------------------------------------------------------------------
 
@@ -281,7 +397,10 @@ export const gammaTrackerApi = {
   volatility: volatilityApi,
   market: marketApi,
   database: databaseApi,
-  system: systemApi
+  system: systemApi,
+  liquidations: liquidationsApi,
+  orderbook: orderbookApi,
+  escape: escapeApi
 };
 
 export default gammaTrackerApi;
