@@ -10,6 +10,7 @@ import VolatilitySkew from "./pages/VolatilitySkew";
 import Anomalies from "./pages/Anomalies";
 import HalfPipe  from "./pages/HalfPipe";
 import StrategyCenter from "./pages/StrategyCenter";
+import MarketMicrostructureDashboard from "./pages/Marketmicrostructuredashboard";
 
 
 
@@ -21,8 +22,9 @@ function Router() {
       <Route path="/volatility-skew" component={VolatilitySkew} />
       <Route path="/anomalies" component={Anomalies} />
       <Route path="/half-pipe" component={HalfPipe} /> 
-      <Route path="/strategy-center" component={StrategyCenter} />     
-      <Route path={"/404"} component={NotFound} />
+      <Route path="/strategy-center" component={StrategyCenter} />
+      <Route path="/microstructure" component={MarketMicrostructureDashboard} />
+      <Route path={"/404"} component={NotFound} />      
       {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
