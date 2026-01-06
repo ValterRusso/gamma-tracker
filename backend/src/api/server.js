@@ -2916,34 +2916,6 @@ this.app.get('/api/orderbook/history', async (req, res) => {
   // ============================================
 
   /**
-   * GET /api/iv-comparison/:dte
-   * Compara IV metrics entre Binance e Deribit
-   * ENDPOINT PRINCIPAL ⭐
-   */
-  this.app.get('/api/iv-comparison/:dte', async (req, res) => {
-    try {
-      const dte = parseInt(req.params.dte);
-      
-      if (isNaN(dte) || dte < 0) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid DTE parameter'
-        });
-      }
-      
-      const comparison = await this.ivComparator.compare(dte);
-      
-      res.json(comparison);
-    } catch (error) {
-      this.logger.error('[API] /api/iv-comparison error:', error.message);
-      res.status(500).json({
-        success: false,
-        error: error.message
-      });
-    }
-  });
-
-  /**
    * GET /api/iv-comparison/multiple
    * Compara múltiplos DTEs de uma vez
    * Query params: ?dtes=1,2,3,7,30
@@ -3059,6 +3031,34 @@ this.app.get('/api/orderbook/history', async (req, res) => {
     });
   }
 });
+
+/**
+   * GET /api/iv-comparison/:dte
+   * Compara IV metrics entre Binance e Deribit
+   * ENDPOINT PRINCIPAL ⭐
+   */
+  this.app.get('/api/iv-comparison/:dte', async (req, res) => {
+    try {
+      const dte = parseInt(req.params.dte);
+      
+      if (isNaN(dte) || dte < 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid DTE parameter'
+        });
+      }
+      
+      const comparison = await this.ivComparator.compare(dte);
+      
+      res.json(comparison);
+    } catch (error) {
+      this.logger.error('[API] /api/iv-comparison error:', error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
 
   
 
