@@ -1,10 +1,10 @@
 // ============================================================================
-// SIDEBAR NAVIGATION - Complete Component
+// SIDEBAR NAVIGATION - Adapted for Wouter
 // Arquivo: src/components/layout/Sidebar.tsx
 // ============================================================================
 
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'wouter';
 import { 
   LayoutDashboard, 
   Activity,
@@ -59,9 +59,9 @@ const navigationSections: NavSection[] = [
     label: 'Volatility',
     icon: Waves,
     items: [
-      { id: 'vol-surface', label: 'Vol Surface (3D)', icon: LineChart, path: '/volatility/surface' },
-      { id: 'vol-skew', label: 'Vol Skew', icon: TrendingUp, path: '/volatility/skew' },
-      { id: 'anomalies', label: 'Anomalies', icon: AlertTriangle, path: '/volatility/anomalies', badge: 'NEW', badgeColor: 'bg-red-500' }
+      { id: 'vol-surface', label: 'Vol Surface (3D)', icon: LineChart, path: '/volatility-surface' },
+      { id: 'vol-skew', label: 'Vol Skew', icon: TrendingUp, path: '/volatility-skew' },
+      { id: 'anomalies', label: 'Anomalies', icon: AlertTriangle, path: '/anomalies' }
     ]
   },
   {
@@ -69,8 +69,8 @@ const navigationSections: NavSection[] = [
     label: 'Trading Signals',
     icon: Zap,
     items: [
-      { id: 'strategy-center', label: 'Strategy Center', icon: Swords, path: '/strategies', badge: 'NEW', badgeColor: 'bg-cyan-500' },
-      { id: 'escape-detector', label: 'Escape Detector', icon: Rocket, path: '/escape' },
+      { id: 'strategy-center', label: 'Strategy Center', icon: Swords, path: '/strategy-center', badge: 'NEW', badgeColor: 'bg-cyan-500' },
+      { id: 'escape-detector', label: 'Half Pipe / Escape', icon: Rocket, path: '/half-pipe' },
       { id: 'microstructure', label: 'Market Microstructure', icon: Gauge, path: '/microstructure', badge: 'HOT', badgeColor: 'bg-orange-500' }
     ]
   },
@@ -87,7 +87,7 @@ const navigationSections: NavSection[] = [
 ];
 
 export default function Sidebar() {
-  const location = useLocation();
+  const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(['gamma', 'volatility', 'trading']);
 
@@ -100,7 +100,7 @@ export default function Sidebar() {
   };
 
   const isActive = (path: string) => {
-    return location.pathname === path;
+    return location === path;
   };
 
   const isSectionActive = (section: NavSection) => {
@@ -186,7 +186,7 @@ export default function Sidebar() {
                       return (
                         <Link
                           key={item.id}
-                          to={item.path}
+                          href={item.path}
                           className={`
                             flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg
                             transition-all group relative
@@ -196,51 +196,52 @@ export default function Sidebar() {
                             }
                             ${collapsed ? 'justify-center' : ''}
                           `}
-                          title={collapsed ? item.label : undefined}
                         >
-                          <ItemIcon className={`w-5 h-5 ${active ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'}`} />
-                          
-                          {!collapsed && (
-                            <>
-                              <span className="text-sm font-medium flex-1">
-                                {item.label}
-                              </span>
-                              
-                              {item.badge && (
-                                <span className={`
-                                  px-2 py-0.5 rounded text-xs font-bold text-white
-                                  ${item.badgeColor || 'bg-slate-600'}
-                                `}>
-                                  {item.badge}
+                          <a className="flex items-center gap-3 w-full">
+                            <ItemIcon className={`w-5 h-5 ${active ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'}`} />
+                            
+                            {!collapsed && (
+                              <>
+                                <span className="text-sm font-medium flex-1">
+                                  {item.label}
                                 </span>
-                              )}
-                            </>
-                          )}
+                                
+                                {item.badge && (
+                                  <span className={`
+                                    px-2 py-0.5 rounded text-xs font-bold text-white
+                                    ${item.badgeColor || 'bg-slate-600'}
+                                  `}>
+                                    {item.badge}
+                                  </span>
+                                )}
+                              </>
+                            )}
 
-                          {/* Active Indicator */}
-                          {active && (
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-cyan-500 rounded-r" />
-                          )}
+                            {/* Active Indicator */}
+                            {active && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-cyan-500 rounded-r" />
+                            )}
 
-                          {/* Tooltip for collapsed state */}
-                          {collapsed && (
-                            <div className="
-                              absolute left-full ml-2 px-3 py-2 bg-slate-800 rounded-lg
-                              opacity-0 group-hover:opacity-100 pointer-events-none
-                              transition-opacity whitespace-nowrap border border-slate-700
-                              shadow-xl z-50
-                            ">
-                              <p className="text-sm text-slate-200">{item.label}</p>
-                              {item.badge && (
-                                <span className={`
-                                  inline-block mt-1 px-2 py-0.5 rounded text-xs font-bold text-white
-                                  ${item.badgeColor || 'bg-slate-600'}
-                                `}>
-                                  {item.badge}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                            {/* Tooltip for collapsed state */}
+                            {collapsed && (
+                              <div className="
+                                absolute left-full ml-2 px-3 py-2 bg-slate-800 rounded-lg
+                                opacity-0 group-hover:opacity-100 pointer-events-none
+                                transition-opacity whitespace-nowrap border border-slate-700
+                                shadow-xl z-50
+                              ">
+                                <p className="text-sm text-slate-200">{item.label}</p>
+                                {item.badge && (
+                                  <span className={`
+                                    inline-block mt-1 px-2 py-0.5 rounded text-xs font-bold text-white
+                                    ${item.badgeColor || 'bg-slate-600'}
+                                  `}>
+                                    {item.badge}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </a>
                         </Link>
                       );
                     })}
