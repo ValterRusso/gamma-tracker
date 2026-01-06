@@ -273,12 +273,7 @@ export default function HalfPipe() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/">
-                <button className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-                  <ArrowLeft className="w-5 h-5" />
-                  <span>Back to Dashboard</span>
-                </button>
-              </Link>
+             
               <div className="h-6 w-px bg-border" />
               <h1 className="text-xl font-bold text-foreground">
                 Half Pipe Command Center
