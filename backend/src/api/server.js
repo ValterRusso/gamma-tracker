@@ -2951,19 +2951,24 @@ this.app.get('/api/orderbook/history', async (req, res) => {
   this.app.get('/api/iv-comparison/multiple', async (req, res) => {
     try {
       const dtesParam = req.query.dtes || '1,2,3,7,30';
-      const dtes = dtesParam.split(',').map(d => parseInt(d.trim())).filter(d => !isNaN(d));
+
+      const dtes = dtesParam.split(',').map(d => parseInt(d.trim())).filter(d => !isNaN(d) && d >= 0);
       
       if (dtes.length === 0) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid DTEs parameter'
+          error: 'Invalid DTEs parameter',
+          example: '/api/iv-comparison/multiple?dtes=1,2,3,7'
         });
       }
+
+      this.logger.info(`[API] Comparing multiple DTEs: ${dtes.join(', ')}`);
       
       const comparisons = await this.ivComparator.compareMultipleDTE(dtes);
       
       res.json({
         success: true,
+        dtes: dtes,
         data: comparisons
       });
     } catch (error) {
@@ -2980,15 +2985,45 @@ this.app.get('/api/orderbook/history', async (req, res) => {
  * Retorna histórico de spreads
  * Query params: ?dte=1&hours=24
  */
-  this.app.get('/api/iv-comparison/history', async (req, res) => {
+ this.app.get('/api/iv-comparison/history', async (req, res) => {
   try {
-    const dte = req.query.dte ? parseInt(req.query.dte) : null;
-    const hours = req.query.hours ? parseInt(req.query.hours) : 24;
+    // Parse DTE (opcional)
+    let dte = null;
+    if (req.query.dte !== undefined && req.query.dte !== '') {
+      dte = parseInt(req.query.dte);
+      if (isNaN(dte) || dte < 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid DTE parameter. Must be a positive integer.',
+          example: '/api/iv-comparison/history?dte=1&hours=12'
+        });
+      }
+    }
+    
+    // Parse hours (opcional, default 24)
+    let hours = 24;
+    if (req.query.hours !== undefined && req.query.hours !== '') {
+      hours = parseInt(req.query.hours);
+      if (isNaN(hours) || hours < 1) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid hours parameter. Must be a positive integer.',
+          example: '/api/iv-comparison/history?dte=1&hours=12'
+        });
+      }
+    }
+    
+    this.logger.info(`[API] Getting history: dte=${dte || 'all'}, hours=${hours}`);
     
     const history = this.ivComparator.getSpreadHistory(dte, hours);
     
     res.json({
       success: true,
+      filters: {
+        dte: dte,
+        hours: hours
+      },
+      count: history.length,
       data: history
     });
   } catch (error) {
@@ -3000,17 +3035,21 @@ this.app.get('/api/orderbook/history', async (req, res) => {
   }
 });
 
+
 /**
  * GET /api/iv-comparison/stats
  * Retorna estatísticas do comparador
  */
-  this.app.get('/api/iv-comparison/stats', async (req, res) => {
+ this.app.get('/api/iv-comparison/stats', (req, res) => {
   try {
+    this.logger.info('[API] Getting IV comparison stats');
+    
     const stats = this.ivComparator.getStats();
     
     res.json({
       success: true,
-      data: stats
+      data: stats,
+      timestamp: Date.now()
     });
   } catch (error) {
     this.logger.error('[API] /api/iv-comparison/stats error:', error.message);
@@ -3020,6 +3059,8 @@ this.app.get('/api/orderbook/history', async (req, res) => {
     });
   }
 });
+
+  
 
 /**
  * GET /api/retail-panic-index
