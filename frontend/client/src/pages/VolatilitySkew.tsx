@@ -131,8 +131,8 @@ export default function VolatilitySkew() {
     );
     
     // Note: moneyness comes as decimal (0.95 = 95%), not percentage
-    const otmPuts = skewData.filter(p => p.moneyness < 95 && p.putIV);
-    const otmCalls = skewData.filter(p => p.moneyness > 105 && p.callIV);
+    const otmPuts = skewData.filter(p => p.moneyness < 97 && p.putIV);
+    const otmCalls = skewData.filter(p => p.moneyness > 103 && p.callIV);
     
     const avgPutIV = otmPuts.length > 0 
       ? otmPuts.reduce((sum, p) => sum + (p.putIV || 0), 0) / otmPuts.length 
@@ -142,7 +142,7 @@ export default function VolatilitySkew() {
       ? otmCalls.reduce((sum, p) => sum + (p.callIV || 0), 0) / otmCalls.length
       : null;
     
-    const skewRatio = (avgPutIV && avgCallIV) ? avgPutIV / avgCallIV : null;
+    const skewRatio = (avgPutIV && avgCallIV) ? avgPutIV / avgCallIV : NaN;
     
     return {
       atmIV: atmPoint.avgIV,
@@ -150,7 +150,7 @@ export default function VolatilitySkew() {
       avgPutIV,
       avgCallIV,
       skewRatio,
-      putCallSpread: (avgPutIV && avgCallIV) ? avgPutIV - avgCallIV : null
+      putCallSpread: (avgPutIV && avgCallIV) ? avgPutIV - avgCallIV : NaN
     };
   };
 
