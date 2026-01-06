@@ -1,12 +1,16 @@
 // ============================================================================
-// MAIN LAYOUT - With Sidebar
+// MAIN LAYOUT - With Sidebar (Wouter version)
 // Arquivo: src/components/layout/MainLayout.tsx
 // ============================================================================
 
-import { Outlet } from 'react-router-dom';
+import { ReactNode } from 'react';
 import Sidebar from './Sidebar';
 
-export default function MainLayout() {
+interface MainLayoutProps {
+  children: ReactNode;
+}
+
+export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-slate-950 flex">
       {/* Sidebar */}
@@ -14,7 +18,7 @@ export default function MainLayout() {
       
       {/* Main Content */}
       <main className="flex-1 overflow-x-hidden">
-        <Outlet />
+        {children}
       </main>
     </div>
   );
