@@ -1,47 +1,63 @@
+// ============================================================================
+// APP.TSX - Updated with Sidebar Layout
+// ============================================================================
+
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import MainLayout from "./components/layout/MainLayout";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import VolatilitySurface from "./pages/VolatilitySurface";
 import VolatilitySkew from "./pages/VolatilitySkew";
 import Anomalies from "./pages/Anomalies";
-import HalfPipe  from "./pages/HalfPipe";
+import HalfPipe from "./pages/HalfPipe";
 import StrategyCenter from "./pages/StrategyCenter";
 import MarketMicrostructureDashboard from "./pages/Marketmicrostructuredashboard";
 
-
-
 function Router() {
   return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/volatility-surface"} component={VolatilitySurface} />
-      <Route path="/volatility-skew" component={VolatilitySkew} />
-      <Route path="/anomalies" component={Anomalies} />
-      <Route path="/half-pipe" component={HalfPipe} /> 
-      <Route path="/strategy-center" component={StrategyCenter} />
-      <Route path="/microstructure" component={MarketMicrostructureDashboard} />
-      <Route path={"/404"} component={NotFound} />      
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
+    <MainLayout>
+      <Switch>
+        {/* Gamma Analysis */}
+        <Route path={"/"} component={Home} />
+        {/* TODO: Uncomment when pages are created
+        <Route path="/gamma-profile" component={GammaProfile} />
+        <Route path="/wall-zones" component={WallZones} />
+        <Route path="/max-pain" component={MaxPain} />
+        */}
+
+        {/* Volatility */}
+        <Route path={"/volatility-surface"} component={VolatilitySurface} />
+        <Route path="/volatility-skew" component={VolatilitySkew} />
+        <Route path="/anomalies" component={Anomalies} />
+
+        {/* Trading Signals */}
+        <Route path="/strategy-center" component={StrategyCenter} />
+        <Route path="/half-pipe" component={HalfPipe} />
+        <Route path="/microstructure" component={MarketMicrostructureDashboard} />
+
+        {/* Real-Time Data */}
+        {/* TODO: Uncomment when pages are created
+        <Route path="/liquidations" component={Liquidations} />
+        <Route path="/orderbook" component={Orderbook} />
+        <Route path="/sentiment" component={MarketSentiment} />
+        */}
+
+        {/* 404 */}
+        <Route path={"/404"} component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </MainLayout>
   );
 }
-
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="dark"
-      >
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
           <Router />
