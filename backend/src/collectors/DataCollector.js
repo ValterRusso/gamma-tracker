@@ -17,6 +17,7 @@ const OrderBookAnalyzer = require('./OrderBookAnalyzer')
 const EscapeTypeDetector = require('../calculators/EscapeTypeDetector');
 const GEXCalculator = require('../calculators/GEXCalculator');
 const e = require('express');
+const { escape } = require('querystring');
 
 class DataCollector extends EventEmitter {
   constructor(config = {}) {
@@ -28,6 +29,7 @@ class DataCollector extends EventEmitter {
       underlying: config.underlying || process.env.DEFAULT_UNDERLYING || 'BTC',
       greeksPollingInterval: config.greeksPollingInterval || 5000, // 5 segundos
       reconnectDelay: config.reconnectDelay || 5000
+
     };
     
     this.logger = new Logger('DataCollector');
@@ -69,10 +71,27 @@ class DataCollector extends EventEmitter {
     this.maxTradesHistory = 100;
     this.tradesWS = null;
 
+    // cool down
+    this.escapeDetectorCooldowwn = 30 * 1000; // 30 segundos
+    this.lastEscapeAlert = {}, // para armazenar timestamps do último alerta por tipo
+
     // Connect to trades stream
     this.connectTradesWebSocket();
 
+  }
 
+  /**
+   * Checks if escape alert can be logged (cooldown)
+   */
+  canLogEscapeAlert(escapeType) {
+    const now = Date.now();
+    const lastAlertTime = this.lastEscapeAlert[escapeType] || 0;
+
+    if (now - lastAlertTime > this.escapeDetectorCooldowwn) {
+      this.lastEscapeAlert[escapeType] = now;
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -209,24 +228,37 @@ class DataCollector extends EventEmitter {
         }
       }, 1000);
 
+      // canLogEscapeAlert is now a class method, see below
+
       // Listen for escape detected events
       this.escapeTypeDetector.on('detection', (detection) => {
-        // this.logger.info(`[escapeTypeDetector] ${detection.type} detected (confidence: ${(detection.confidence * 100).toFixed(0)}%)`);
+        if (this.canLogEscapeAlert('detection')) {
+          this.logger.info(`[escapeTypeDetector] ${detection.type} detected (confidence: ${(detection.confidence * 100).toFixed(0)}%)`);
+        }        
       });
       
       this.escapeTypeDetector.on('h1_detected', (detection) => {
-        this.logger.info('🚀 [escapeTypeDetector] H1 (Good Escape) detected!');
-        this.logger.info(`   ${detection.interpretation}`);
+        if (this.canLogEscapeAlert('h1')) {
+          this.logger.info('🚀 [escapeTypeDetector] H1 (Good Escape) detected!');
+          this.logger.info(`   ${detection.interpretation}`);
+          this.logger.debug(`   (Next alert in ${this.escapeDetectorCooldown / 1000}s)`)
+        }
       });
       
-      //this.escapeTypeDetector.on('h2_detected', (detection) => {
-       // this.logger.warn('⚠️ [escapeTypeDetector] H2 (False Escape) detected!');
-       // this.logger.warn(`   ${detection.interpretation}`);
-      //});
+      this.escapeTypeDetector.on('h2_detected', (detection) => {
+        if (this.canLogEscapeAlert('h2')) {
+          this.logger.warn('⚠️ [escapeTypeDetector] H2 (False Escape) detected!');
+          this.logger.warn(`   ${detection.interpretation}`);
+          this.logger.debug(`   (Next alert in ${this.escapeDetectorCooldown / 1000}s)`)
+        }
+      });
       
       this.escapeTypeDetector.on('h3_detected', (detection) => {
-        this.logger.error('💀 [escapeTypeDetector] H3 (Liquidity Collapse) detected!');
-        this.logger.error(`   ${detection.interpretation}`);
+        if (this.canLogEscapeAlert('h3')) {
+          this.logger.error('💀 [escapeTypeDetector] H3 (Liquidity Collapse) detected!');
+          this.logger.error(`   ${detection.interpretation}`);
+          this.logger.debug(`   (Next alert in ${this.escapeDetectorCooldown / 1000}s)`)
+        }
       });
       
       const ALERTS_MUTED = false; // Mudar para false para ativar alertas
