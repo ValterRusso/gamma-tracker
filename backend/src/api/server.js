@@ -76,6 +76,9 @@ const MarketStateAnalyzer = require('../recommender/MarketStateAnalyzer');
 const StrategyRecommender = require('../recommender/StrategyRecommender');
 const EntropyCalculator = require('../calculators/EntropyCalculator');
 const RSICalculator = require('../calculators/RSICalculator');
+const DeribitAPI = require('../integrations/DeribitAPI');
+const BinanceAdapter = require('../integrations/BinanceAdapter');
+const IVComparator = require('../calculators/IVComparator');
 const { Op } = require('sequelize');
 
 
@@ -93,6 +96,7 @@ class APIServer {
       port: config.port || process.env.API_PORT || 3300,
       host: config.host || '0.0.0.0'
     };
+    
 
     this.logger = new Logger('APIServer');
     this.anomalyDetector = new VolatilityAnomalyDetector(this.logger);
@@ -107,6 +111,14 @@ class APIServer {
     });
 
     this.rsiCalculator.start();
+
+    // Integrations
+    this.deribitAPI = new DeribitAPI(this.logger);
+    this.binanceAdapter = new BinanceAdapter(this.dataCollector, this.logger);
+    this.ivComparator = new IVComparator(this.binanceAdapter, this.deribitAPI, this.logger);
+
+    // comparador IV inicializado
+    this.logger.info('[Server] Deribit integration initialized');
 
     this.app = express();
     this.server = null;
@@ -2738,7 +2750,309 @@ this.app.get('/api/orderbook/history', async (req, res) => {
     }
   });
 
+  // ============================================
+  // 3. ENDPOINTS BINANCE (via adapter)
+  // ============================================
 
+  /**
+   * GET /api/binance/iv-surface
+   * Retorna IV surface da Binance via adapter
+   */
+  this.app.get('/api/binance/iv-surface', async (req, res) => {
+    try {
+      const surface = await this.binanceAdapter.getIVSurface();
+      
+      if (!surface) {
+        return res.status(503).json({
+          success: false,
+          error: 'Failed to fetch Binance IV surface'
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: surface
+      });
+    } catch (error) {
+      this.logger.error('[API] /api/binance/iv-surface error:', error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/binance/iv-metrics/:dte
+   * Retorna métricas de IV da Binance para um DTE específico
+   */
+  this.app.get('/api/binance/iv-metrics/:dte', async (req, res) => {
+    try {
+      const dte = parseInt(req.params.dte);
+      
+      if (isNaN(dte) || dte < 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid DTE parameter'
+        });
+      }
+      
+      const metrics = await this.binanceAdapter.getIVMetricsByDTE(dte);
+      
+      if (!metrics) {
+        return res.status(404).json({
+          success: false,
+          error: `No data available for ${dte} DTE`
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: metrics
+      });
+    } catch (error) {
+      this.logger.error('[API] /api/binance/iv-metrics error:', error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/binance/stats
+   * Retorna estatísticas do adapter
+   */
+  this.app.get('/api/binance/stats', (req, res) => {
+    try {
+      const stats = this.binanceAdapter.getStats();
+      
+      res.json({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      this.logger.error('[API] /api/binance/stats error:', error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+
+  // ============================================
+  // 4. ENDPOINTS DERIBIT
+  // ============================================
+
+  /**
+   * GET /api/deribit/iv-surface
+   * Retorna IV surface completa da Deribit
+   */
+  this.app.get('/api/deribit/iv-surface', async (req, res) => {
+    try {
+      const surface = await this.deribitAPI.getIVSurface();
+      
+      if (!surface) {
+        return res.status(503).json({
+          success: false,
+          error: 'Failed to fetch Deribit IV surface'
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: surface
+      });
+    } catch (error) {
+      this.logger.error('[API] /api/deribit/iv-surface error:', error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/deribit/iv-metrics/:dte
+   * Retorna métricas de IV da Deribit para um DTE específico
+   */
+  this.app.get('/api/deribit/iv-metrics/:dte', async (req, res) => {
+    try {
+      const dte = parseInt(req.params.dte);
+      
+      if (isNaN(dte) || dte < 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid DTE parameter'
+        });
+      }
+      
+      const metrics = await this.deribitAPI.getIVMetricsByDTE(dte);
+      
+      if (!metrics) {
+        return res.status(404).json({
+          success: false,
+          error: `No data available for ${dte} DTE`
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: metrics
+      });
+    } catch (error) {
+      this.logger.error('[API] /api/deribit/iv-metrics error:', error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+
+  // ============================================
+  // 5. ENDPOINTS DE COMPARAÇÃO
+  // ============================================
+
+  /**
+   * GET /api/iv-comparison/:dte
+   * Compara IV metrics entre Binance e Deribit
+   * ENDPOINT PRINCIPAL ⭐
+   */
+  this.app.get('/api/iv-comparison/:dte', async (req, res) => {
+    try {
+      const dte = parseInt(req.params.dte);
+      
+      if (isNaN(dte) || dte < 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid DTE parameter'
+        });
+      }
+      
+      const comparison = await this.ivComparator.compare(dte);
+      
+      res.json(comparison);
+    } catch (error) {
+      this.logger.error('[API] /api/iv-comparison error:', error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/iv-comparison/multiple
+   * Compara múltiplos DTEs de uma vez
+   * Query params: ?dtes=1,2,3,7,30
+   */
+  this.app.get('/api/iv-comparison/multiple', async (req, res) => {
+    try {
+      const dtesParam = req.query.dtes || '1,2,3,7,30';
+      const dtes = dtesParam.split(',').map(d => parseInt(d.trim())).filter(d => !isNaN(d));
+      
+      if (dtes.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid DTEs parameter'
+        });
+      }
+      
+      const comparisons = await this.ivComparator.compareMultipleDTE(dtes);
+      
+      res.json({
+        success: true,
+        data: comparisons
+      });
+    } catch (error) {
+      this.logger.error('[API] /api/iv-comparison/multiple error:', error.message);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+/**
+ * GET /api/iv-comparison/history
+ * Retorna histórico de spreads
+ * Query params: ?dte=1&hours=24
+ */
+  this.app.get('/api/iv-comparison/history', async (req, res) => {
+  try {
+    const dte = req.query.dte ? parseInt(req.query.dte) : null;
+    const hours = req.query.hours ? parseInt(req.query.hours) : 24;
+    
+    const history = this.ivComparator.getSpreadHistory(dte, hours);
+    
+    res.json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    this.logger.error('[API] /api/iv-comparison/history error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/iv-comparison/stats
+ * Retorna estatísticas do comparador
+ */
+  this.app.get('/api/iv-comparison/stats', async (req, res) => {
+  try {
+    const stats = this.ivComparator.getStats();
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    this.logger.error('[API] /api/iv-comparison/stats error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/retail-panic-index
+ * Retorna apenas o Retail Panic Index (endpoint simplificado)
+ * Query params: ?dte=1
+ */
+  this.app.get('/api/retail-panic-index', async (req, res) => {
+  try {
+    const dte = req.query.dte ? parseInt(req.query.dte) : 1;
+    const comparison = await this.ivComparator.compare(dte);
+    
+    if (!comparison.success) {
+      return res.status(503).json(comparison);
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        dte,
+        retailPanicIndex: comparison.retailPanicIndex,
+        putSpread: comparison.spreads.putSpread,
+        alerts: comparison.alerts.filter(a => a.type === 'RETAIL_PANIC'),
+        timestamp: comparison.timestamp
+      }
+    });
+  } catch (error) {
+    this.logger.error('[API] /api/retail-panic-index error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 
     // Regime History endpoint
