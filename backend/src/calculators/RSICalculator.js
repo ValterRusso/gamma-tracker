@@ -402,6 +402,106 @@ class RSICalculator extends EventEmitter {
   getCandles() {
     return this.candles;
   }
+    /**
+   * Obter estatísticas (alias para getMetrics)
+   * @returns {Object} Estatísticas de RSI
+   */
+  getStats() {
+    return {
+      rsi: {
+        current: this.current.rsi,
+        status: this.current.status,
+        ready: this.current.ready,
+        timestamp: this.current.timestamp,
+        history: this.rsiHistory
+      },
+      calculations: this.stats.calculations,
+      overbought_count: this.stats.overbought_count,
+      oversold_count: this.stats.oversold_count,
+      neutral_count: this.stats.neutral_count,
+      last_fetch: this.stats.last_fetch,
+      fetch_errors: this.stats.fetch_errors
+    };
+  }
+  
+  /**
+   * Detectar divergência entre RSI e preço
+   * @param {number} currentPrice - Preço atual
+   * @param {Array} priceHistory - Histórico de preços (opcional)
+   * @returns {Object|null} Divergência detectada ou null
+   */
+  detectDivergence(currentPrice, priceHistory = null) {
+    // Verificar se tem dados suficientes
+    if (this.rsiHistory.length < 10) {
+      return null;
+    }
+    
+    // Pegar últimos 10 pontos de RSI
+    const recentRSI = this.rsiHistory.slice(-10);
+    
+    // Pegar últimos 10 preços (dos candles)
+    const recentPrices = this.candles.slice(-10).map(c => c.close);
+    
+    if (recentPrices.length < 10) {
+      return null;
+    }
+    
+    // Encontrar picos de preço
+    const priceHigh = Math.max(...recentPrices);
+    const priceLow = Math.min(...recentPrices);
+    const priceHighIndex = recentPrices.indexOf(priceHigh);
+    const priceLowIndex = recentPrices.indexOf(priceLow);
+    
+    // Encontrar picos de RSI
+    const rsiValues = recentRSI.map(r => r.rsi);
+    const rsiHigh = Math.max(...rsiValues);
+    const rsiLow = Math.min(...rsiValues);
+    const rsiHighIndex = rsiValues.indexOf(rsiHigh);
+    const rsiLowIndex = rsiValues.indexOf(rsiLow);
+    
+    // Detectar divergência bullish (preço faz lower low, RSI faz higher low)
+    if (priceLowIndex < recentPrices.length - 1) {
+      const currentPriceLow = recentPrices[recentPrices.length - 1];
+      const previousPriceLow = priceLow;
+      const currentRSILow = rsiValues[rsiValues.length - 1];
+      const previousRSILow = rsiLow;
+      
+      if (currentPriceLow < previousPriceLow && currentRSILow > previousRSILow) {
+        return {
+          type: 'BULLISH_DIVERGENCE',
+          message: 'Price making lower low, RSI making higher low',
+          confidence: 'MEDIUM',
+          priceChange: ((currentPriceLow - previousPriceLow) / previousPriceLow * 100).toFixed(2),
+          rsiChange: (currentRSILow - previousRSILow).toFixed(2),
+          timestamp: Date.now()
+        };
+      }
+    }
+    
+    // Detectar divergência bearish (preço faz higher high, RSI faz lower high)
+    if (priceHighIndex < recentPrices.length - 1) {
+      const currentPriceHigh = recentPrices[recentPrices.length - 1];
+      const previousPriceHigh = priceHigh;
+      const currentRSIHigh = rsiValues[rsiValues.length - 1];
+      const previousRSIHigh = rsiHigh;
+      
+      if (currentPriceHigh > previousPriceHigh && currentRSIHigh < previousRSIHigh) {
+        return {
+          type: 'BEARISH_DIVERGENCE',
+          message: 'Price making higher high, RSI making lower high',
+          confidence: 'MEDIUM',
+          priceChange: ((currentPriceHigh - previousPriceHigh) / previousPriceHigh * 100).toFixed(2),
+          rsiChange: (currentRSIHigh - previousRSIHigh).toFixed(2),
+          timestamp: Date.now()
+        };
+      }
+    }
+    
+    // Sem divergência detectada
+    return null;
+  }
 }
 
 module.exports = RSICalculator;
+
+
