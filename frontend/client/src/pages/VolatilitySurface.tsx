@@ -198,26 +198,7 @@ export default function VolatilitySurface() {
   return (
     <div className="min-h-screen bg-slate-950 p-6">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-4 mb-4">
-          <Link href="/">
-            <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-              <span className="font-medium">Back to Gamma</span>
-            </button>
-          </Link>
-          <Link href="/volatility-skew">
-            <button className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors">
-              <BarChart3 className="w-4 h-4" />
-              <span className="font-medium">2D Skew Viewer</span>
-            </button>
-          </Link>
-          <Link href="/anomalies">
-            <button className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors">
-              <span className="font-medium">🔍 Anomalies</span>
-            </button>
-          </Link>
-        </div>
+      <div className="mb-6">       
         <h1 className="text-3xl font-bold text-slate-100 mb-2">
           Superfície de Volatilidade Implícita
         </h1>
