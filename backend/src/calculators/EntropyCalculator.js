@@ -22,7 +22,7 @@
  * H = -Σ (p_i * log₂(p_i))
  * Onde p_i = volume_i / volume_total
  * 
- * AUTOR: Gamma Tracker Team
+ * AUTOR: Valter Russo - Gamma Tracker Team
  * DATA: 2026-01-04
  * ============================================================================
  */
@@ -532,7 +532,7 @@ class EntropyCalculator extends EventEmitter {
    * @param {number} limit - Número máximo de pontos
    * @returns {Array}
    */
-  getHistory(limit = 1000) {
+   getHistory(limit = 1000) {
     const minLength = Math.min(
       this.history.bid.length,
       this.history.ask.length,
