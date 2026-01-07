@@ -198,18 +198,8 @@ export default function VolatilitySkew() {
     <div className="min-h-screen bg-slate-950 p-6">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-4 mb-4">
-          <Link href="/volatility-surface">
-            <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-              <span className="font-medium">Back to 3D Surface</span>
-            </button>
-          </Link>
-          <Link href="/anomalies">
-            <button className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors">
-              <span className="font-medium">🔍 Anomalies</span>
-            </button>
-          </Link>
+        <div className="flex items-center gap-4 mb-4">        
+          
         </div>
         <h1 className="text-3xl font-bold text-slate-100 mb-2">
           Volatility Skew Analysis
