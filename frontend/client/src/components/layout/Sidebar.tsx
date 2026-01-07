@@ -120,7 +120,11 @@ export default function Sidebar() {
           {!collapsed && (
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-linear-to-br from-cyan-500 to-purple-500 rounded-lg flex items-center justify-center">
-                <Activity className="w-5 h-5 text-white" />
+                <img
+                    src="/assets/favicon180x180.png"
+                    alt="Logo"
+                    className="w-15 h-15"
+                />
               </div>
               <div>
                 <h1 className="text-lg font-bold text-slate-100">Gamma Tracker</h1>
