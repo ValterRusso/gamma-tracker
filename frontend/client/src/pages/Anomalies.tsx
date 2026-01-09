@@ -92,7 +92,7 @@ export default function Anomalies() {
         params.append('type', typeFilter);
       }
       
-      const response = await fetch(`http://localhost:3300/api/vol-anomalies?${params}`);
+      const response = await fetch(`http://localhost:3300/api/anomalies?${params}`);
       const result = await response.json();
       
       if (result.success) {
