@@ -62,17 +62,27 @@ interface EscapeDetection {
 
 // Metrics interface for /api/metrics endpoint
 interface MetricsData {
+  spotPrice:number;
+  totalGEX: {
+    total: number;
+    calls: number;
+    puts: number;
+    netGamma: string;
+  };
   gammaFlip: {
     level: number;
-    confidence: string;
-    currentSpot: number;
+    currentSpot: number; 
+    distanceFromSpot: number;
     distancePercent: number;
+    confidence: string;    
+    nearbyStrikes: number[];    
   };
   putWall: {
     strike: number;
     gex: number;
     oi: number;
     gamma: number;
+    distanceFromSpot: number;
     distancePercent: number;
   };
   callWall: {
@@ -80,6 +90,7 @@ interface MetricsData {
     gex?: number;
     oi: number;
     gamma: number;
+    distanceFromSpot: number;
     distancePercent: number;
   };
   regime: string;
@@ -101,9 +112,15 @@ export default function HalfPipe() {
       const response = await axios.get('http://localhost:3300/api/metrics', {
         timeout: 5000
       });
+
+      const metricsData = response.data.data;
+
       console.log('✅ Metrics received:', response.data);
-      setMetrics(response.data);
-      return response.data;
+
+      setMetrics(metricsData);
+
+      return metricsData;
+
     } catch (err: any) {
       console.warn('⚠️ Failed to fetch metrics:', err.message);
       return null;
@@ -152,7 +169,7 @@ export default function HalfPipe() {
       fetchMetrics().then(metricsData => {
         if (metricsData) {
           console.log('✅ Using REAL metrics data:');
-          console.log('  📊 Current Price:', metricsData.gammaFlip.currentSpot);
+          console.log('  📊 Current Price:', metricsData.spotPrice);
           console.log('  📊 Gamma Flip:', metricsData.gammaFlip.level);
           console.log('  📊 Put Wall:', metricsData.putWall.strike);
           console.log('  📊 Call Wall:', metricsData.callWall.strike);
