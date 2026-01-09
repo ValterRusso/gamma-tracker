@@ -39,9 +39,10 @@ export function useStrategyRecommendations(
       const result = await gammaTrackerApi.strategies.getRecommendations();
       
       if (result.success) {
-        setRecommendations(result.data);
-        setMarketState(result.marketState);
-        setTimestamp(result.timestamp);
+        // Extract data correctly from nested structure
+        setRecommendations(result.data.recommendations || []);
+        setMarketState(result.data.marketState || null);
+        setTimestamp(new Date().toISOString());
         setError(null);
       } else {
         setError('Failed to fetch recommendations');
@@ -49,6 +50,7 @@ export function useStrategyRecommendations(
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       console.error('Error fetching strategy recommendations:', err);
+      setRecommendations([]);
     } finally {
       setLoading(false);
     }
@@ -102,9 +104,10 @@ export function useAllStrategies(
       const result = await gammaTrackerApi.strategies.getAll();
       
       if (result.success) {
-        setStrategies(result.data);
-        setMarketState(result.marketState);
-        setTimestamp(result.timestamp);
+        // Extract data correctly from nested structure
+        setStrategies(result.data.strategies || []);
+        setMarketState(result.data.marketState || null);
+        setTimestamp(new Date().toISOString());
         setError(null);
       } else {
         setError('Failed to fetch strategies');
@@ -112,6 +115,7 @@ export function useAllStrategies(
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       console.error('Error fetching all strategies:', err);
+      setStrategies([]);
     } finally {
       setLoading(false);
     }
@@ -165,8 +169,9 @@ export function useStrategy(strategyId: string | null): UseStrategyReturn {
       const result = await gammaTrackerApi.strategies.getById(strategyId);
       
       if (result.success) {
-        setStrategy(result.data);
-        setMarketState(result.marketState);
+        // Extract data correctly from nested structure
+        setStrategy(result.data.strategy || null);
+        setMarketState(result.data.marketState || null);
         setError(null);
       } else {
         setError('Failed to fetch strategy');
@@ -174,6 +179,7 @@ export function useStrategy(strategyId: string | null): UseStrategyReturn {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       console.error('Error fetching strategy:', err);
+      setStrategy(null);
     } finally {
       setLoading(false);
     }
