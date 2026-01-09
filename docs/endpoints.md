@@ -2,30 +2,19 @@
 
 Entropy endpoints:
 
-works:
-
 ✅ - api/entropy
 
 ✅ - api/entropy/events?limit=5
 
 ✅ - api/entropy/history?limit=100
 
+✅ - api/entropy/divergence    
 
-✅ - api/entropy/divergence  (corrigido)
+✅ - api/entropy/stats   
 
-    success": true,
-    "data": null
-    
+ 
 
-✅ - api/entropy/stats   (corrigido)
-
-    success": true,
-    "data": { ... }
-
-
-comparison endpoints:
-
-works:
+comparison endpoints
 
 ✅ - api/iv-comparison/1
 
@@ -45,28 +34,13 @@ works:
 
 ✅ - api/iv-comparison/:dte
 
-not works
+✅ - api/iv-comparison/multiple   
 
-❌ - api/iv-comparison/multiple
-      
-     error:
+✅- api/iv-comparison/history     
 
-      "success": false,
-    "error": "Invalid DTE parameter"
+✅ - api/iv-comparison/stats  
 
-❌ - api/iv-comparison/history 
-
-     error:
-
-    "success": false,
-    "error": "Invalid DTE parameter"
-
-❌ - api/iv-comparison/stats  
-
-     error:
-
-    "success": false,
-    "error": "Invalid DTE parameter"   (muito estranho, pois nao usa dte)
+ 
 
 
 
