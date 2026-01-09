@@ -114,9 +114,10 @@ export interface StrategyRecommendation extends Strategy {
 
 export interface StrategyDetailResponse {
   success: boolean;
-  data: StrategyRecommendation;
-  marketState: MarketState;
-  timestamp: string;
+  data: {
+    strategy: StrategyRecommendation;
+    marketState: MarketState | null;
+  };
 }
 
 // ----------------------------------------------------------------------------
@@ -150,17 +151,21 @@ export interface MarketState {
 
 export interface StrategyRecommendationsResponse {
   success: boolean;
-  data: StrategyRecommendation[];
-  marketState: MarketState;
-  timestamp: string;
-  meta: ApiMetaInfo;
+  data: {
+    recommendations: StrategyRecommendation[];
+    marketState: MarketState;
+    totalStrategies: number;
+    spotPrice: number;
+    regime: string;
+  };
 }
 
 export interface AllStrategiesResponse {
   success: boolean;
-  data: StrategyRecommendation[];
-  marketState: MarketState;
-  timestamp: string;
+  data: {
+    strategies: StrategyRecommendation[];
+    marketState: MarketState;
+  };
 }
 
 // ----------------------------------------------------------------------------
