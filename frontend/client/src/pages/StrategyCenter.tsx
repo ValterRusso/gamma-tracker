@@ -25,7 +25,7 @@ export default function StrategyCenter() {
   const [sortBy, setSortBy] = useState<'score' | 'name'>('score');
 
   // Filter strategies
-  const filteredStrategies = recommendations.filter(strategy => {
+  const filteredStrategies = (recommendations || []).filter(strategy => {
     if (filterCategory === 'ALL') return true;
     return strategy.category === filterCategory;
   });
