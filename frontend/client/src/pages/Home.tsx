@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Activity, TrendingUp, TrendingDown, Target, Shield, AlertTriangle, BarChart3, Mountain } from "lucide-react";
-import LoadingScreen from "@/components/LoadingScreen";
-import { Link } from "wouter";
+// import LoadingScreen from "@/components/LoadingScreen";
+// import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, ReferenceArea } from "recharts";
 import axios from "axios";
 import MaxPainCard from "@/components/MaxPainCard";
@@ -28,7 +28,8 @@ interface WallZone {
 
 interface Metrics {
   totalGEX: { total: number; calls: number; puts: number; netGamma: string };
-  gammaFlip: { level: number; currentSpot: number; distancePercent: number; confidence: string };
+  currentSpot: number;
+  gammaFlip: { level: number; distanceFromSpot: number; distancePercent: number; confidence: string; nearbyStrikes:number[] };
   walls: {
     putWall: { strike: number; gex: number; distancePercent: number };
     callWall: { strike: number; gex: number; distancePercent: number };
@@ -79,6 +80,7 @@ export default function Home() {
       setMetrics({
         totalGEX: totalGEX.data.data,
         gammaFlip: gammaFlip.data.data,
+        currentSpot: gammaFlip.data.data.currentSpot,
         walls: walls.data.data,
         wallZones: wallZones.data.data,
         insights: insights.data.data,
@@ -124,14 +126,17 @@ export default function Home() {
     }).format(value);
   };
 
-  const getRegimeColor = (regime: string) => {
+  const getRegimeColor = (regime: string | null | undefined) => {
+    if (!regime) return "text-gray-400";
+    
     if (regime.includes("POSITIVE_GAMMA_ABOVE")) return "text-emerald-400";
     if (regime.includes("POSITIVE_GAMMA_BELOW")) return "text-amber-400";
     if (regime.includes("NEGATIVE_GAMMA")) return "text-rose-400";
     return "text-gray-400";
   };
 
-  const getVolatilityColor = (vol: string) => {
+  const getVolatilityColor = (vol: string | null | undefined) => {
+    if (!vol) return "test-gray-400"
     if (vol === "LOW") return "text-emerald-400";
     if (vol === "MEDIUM") return "text-amber-400";
     if (vol === "HIGH") return "text-rose-400";
@@ -226,7 +231,7 @@ export default function Home() {
             <div className="mt-4 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Current Spot:</span>
-                <span className="font-mono">${formatNumber(metrics.gammaFlip.currentSpot)}</span>
+                <span className="font-mono">${formatNumber(metrics.currentSpot)}</span>
               </div>
               <div className="flex items-center justify-between mt-1">
                 <span className="text-muted-foreground">Distance:</span>
@@ -466,7 +471,7 @@ export default function Home() {
               <div>
                 <h2 className="text-lg font-bold">Market Regime</h2>
                 <p className="text-sm text-muted-foreground">
-                  {metrics.insights.regime.description}
+                  {metrics.insights.regime.description || "no regime data available"}
                 </p>
               </div>
             </div>
@@ -479,7 +484,7 @@ export default function Home() {
                       metrics.insights.regime.regime
                     )}`}
                   >
-                    {metrics.insights.regime.regime.replace(/_/g, " ")}
+                    {metrics.insights.regime.regime?.replace(/_/g, " ") || "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -489,14 +494,14 @@ export default function Home() {
                       metrics.insights.regime.volatilityExpectation
                     )}`}
                   >
-                    {metrics.insights.regime.volatilityExpectation}
+                    {metrics.insights.regime.volatilityExpectation || "N/A"}
                   </span>
                 </div>
               </div>
               <div className="pt-4 border-t border-border">
                 <h3 className="text-sm font-semibold mb-2">Implications</h3>
                 <ul className="space-y-2">
-                  {metrics.insights.regime.implications.map((implication, index) => (
+                  {metrics.insights.regime.implications?.map((implication, index) => (
                     <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
                       <span className="text-primary mt-1">•</span>
                       <span>{implication}</span>
@@ -511,7 +516,7 @@ export default function Home() {
           <Card className="p-6 bg-card border-border">
             <h2 className="text-lg font-bold mb-4">Significant Levels</h2>
             <div className="space-y-2">
-              {metrics.insights.distribution.significantLevels.slice(0, 8).map((level, index) => (
+              {metrics.insights.distribution?.significantLevels.slice(0, 8).map((level, index) => (
                 <div
                   key={index}
                   className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
