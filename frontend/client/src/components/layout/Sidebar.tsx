@@ -192,7 +192,7 @@ export default function Sidebar() {
                           key={item.id}
                           href={item.path}
                           className={`
-                            flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg
+                            flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg w-full
                             transition-all group relative
                             ${active 
                               ? 'bg-linear-to-r from-cyan-500/20 to-purple-500/20 text-cyan-400 border border-cyan-500/30' 
@@ -201,7 +201,6 @@ export default function Sidebar() {
                             ${collapsed ? 'justify-center' : ''}
                           `}
                         >
-                          <a className="flex items-center gap-3 w-full">
                             <ItemIcon className={`w-5 h-5 ${active ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'}`} />
                             
                             {!collapsed && (
@@ -245,7 +244,6 @@ export default function Sidebar() {
                                 )}
                               </div>
                             )}
-                          </a>
                         </Link>
                       );
                     })}
