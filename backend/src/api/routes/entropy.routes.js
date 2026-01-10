@@ -38,7 +38,7 @@ module.exports = (dependencies) => {
    * GET /api/entropy
    * Entropy atual + RSI
    */
-  router.get('/entropy', 
+  router.get('/entropy-rsi', 
     validateQuery({
       depth: { type: 'number', min: 20, max: 200 }
     }),
