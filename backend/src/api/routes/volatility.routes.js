@@ -7,7 +7,7 @@
  * 
  * ENDPOINTS:
  * - GET /api/vol-surface      - Superfície de volatilidade 3D
- * - GET /api/vol-anomalies    - Anomalias detectadas
+ * - GET /api/anomalies        - Anomalias detectadas
  * - GET /api/insights         - Insights de regime
  * 
  * @author Valter Russo - Gamma Tracker Team
@@ -53,7 +53,7 @@ module.exports = (dependencies) => {
   );
 
   /**
-   * GET /api/vol-anomalies
+   * GET /api/anomalies
    * Anomalias de volatilidade detectadas
    * 
    * Query params:
