@@ -1,0 +1,69 @@
+Health Check                            [32m OK (200) [0m
+Status                                  [32m OK (200) [0m
+Metrics                                 [32m OK (200) [0m
+Insights                                [32m OK (200) [0m
+Gamma Profile                           [32m OK (200) [0m
+Total GEX                               [32m OK (200) [0m
+Gamma Flip                              [32m OK (200) [0m
+Walls                                   [32m OK (200) [0m
+Wall Zones                              [32m OK (200) [0m
+List all Options                        [32m OK (200) [0m
+By Strike                               [32m OK (200) [0m
+Unique strikes                          [32m OK (200) [0m
+Unique Expires                          [32m OK (200) [0m
+Vol Surface                             [32m OK (200) [0m
+Anomalies (default)                     [32m OK (200) [0m
+Anomalies (filtered)                    [32m OK (200) [0m
+Strategies Recommend                    [32m OK (200) [0m
+Strategies All                          [32m OK (200) [0m
+Strategy Detail                         [32m OK (200) [0m
+Escape Detect                           [32m OK (200) [0m
+Escape probability                      [32m OK (200) [0m
+Escape conditions                       [32m OK (200) [0m
+Escape summary                          [32m OK (200) [0m
+Escape active alerts                    [32m OK (200) [0m
+Escape Energy                           [32m OK (200) [0m
+Escape History                          [32m OK (200) [0m
+Liquidations Summary                    [32m OK (200) [0m
+Liquidations Stats                      [32m OK (200) [0m
+Liquidations Energy                     [32m OK (200) [0m
+Liquidations Recent                     [32m OK (200) [0m
+Liquidations Early                      [32m OK (200) [0m
+Liquidations Growth                     [32m OK (200) [0m
+Liquidations Cascade                    [32m OK (200) [0m
+Orderbiik metrics                       [32m OK (200) [0m
+Orderbook Imbalance                     [32m OK (200) [0m
+Orderbook depth                         [32m OK (200) [0m
+Orderbook spread                        [32m OK (200) [0m
+Orderbook walls                         [32m OK (200) [0m
+Orderbook energy                        [32m OK (200) [0m
+Orderbook history                       [32m OK (200) [0m
+Entropy Current + RSI                   [32m OK (200) [0m
+Entropy Stats                           [32m OK (200) [0m
+Entropy Events                          [32m OK (200) [0m
+Entropy history                         [32m OK (200) [0m
+Entropy divergence                      [32m OK (200) [0m
+Entropy depth                           [32m OK (200) [0m
+Entropy Assets                          [32m OK (200) [0m
+RSI + Volume                            [32m OK (200) [0m
+volume trend                            [32m OK (200) [0m
+Todas divergencias                      [32m OK (200) [0m
+Sentiment                               [32m OK (200) [0m
+Max Pain                                [32m OK (200) [0m
+IV Comparison                           [32m OK (200) [0m
+history                                 [32m OK (200) [0m
+multiple                                [32m OK (200) [0m
+Stats                                   [32m OK (200) [0m
+Retail Panic Index                      [32m OK (200) [0m
+IV Surface Binance                      [32m OK (200) [0m
+Metrics by dte                          [32m OK (200) [0m
+Adapter stats                           [32m OK (200) [0m
+IV Surface Deribit                      [32m OK (200) [0m
+Metrics Deribit by dte                  [32m OK (200) [0m
+Retail Panic Index                      [32m OK (200) [0m
+Complete Analysis                       [32m OK (200) [0m
+Analysis History                        [32m OK (200) [0m
+Analysis Stats                          [32m OK (200) [0m
+Analysis pattern                        [32m OK (200) [0m
+Historical Snapshots                    [32m OK (200) [0m
+Historical regime                       [32m OK (200) [0m
