@@ -16,6 +16,7 @@ import Anomalies from "./pages/Anomalies";
 import HalfPipe from "./pages/HalfPipe";
 import StrategyCenter from "./pages/StrategyCenter";
 import MarketMicrostructureDashboard from "./pages/Marketmicrostructuredashboard";
+import EntropyOverview from "./pages/EntropyOverview";
 
 function Router() {
   return (
@@ -38,6 +39,9 @@ function Router() {
         <Route path="/strategy-center" component={StrategyCenter} />
         <Route path="/half-pipe" component={HalfPipe} />
         <Route path="/microstructure" component={MarketMicrostructureDashboard} />
+
+        {/* Entropy Analysis */}
+        <Route path="/entropy/overview" component={EntropyOverview} /> 
 
         {/* Real-Time Data */}
         {/* TODO: Uncomment when pages are created
