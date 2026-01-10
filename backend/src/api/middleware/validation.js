@@ -60,6 +60,119 @@ const validateBody = (schema) => {
   };
 };
 
+function validateQueryParams(schema) {
+  return (req, res, next) => {
+    const errors = [];
+    const validated = {};
+
+    for (const [param, rules] of Object.entries(schema)) {
+      let value = req.query[param];
+
+      // Apply default if not provided
+      if (value === undefined || value === null || value === '') {
+        if (rules.default !== undefined) {
+          validated[param] = rules.default;
+          continue;
+        }
+        if (rules.required) {
+          errors.push(`${param} is required`);
+          continue;
+        }
+        continue;
+      }
+
+      // Type conversion and validation
+      try {
+        switch (rules.type) {
+          case 'int':
+            value = parseInt(value);
+            if (isNaN(value)) {
+              errors.push(`${param} must be an integer`);
+              break;
+            }
+            if (rules.min !== undefined && value < rules.min) {
+              errors.push(`${param} must be >= ${rules.min}`);
+            }
+            if (rules.max !== undefined && value > rules.max) {
+              errors.push(`${param} must be <= ${rules.max}`);
+            }
+            validated[param] = value;
+            break;
+
+          case 'float':
+            value = parseFloat(value);
+            if (isNaN(value)) {
+              errors.push(`${param} must be a number`);
+              break;
+            }
+            if (rules.min !== undefined && value < rules.min) {
+              errors.push(`${param} must be >= ${rules.min}`);
+            }
+            if (rules.max !== undefined && value > rules.max) {
+              errors.push(`${param} must be <= ${rules.max}`);
+            }
+            validated[param] = value;
+            break;
+
+          case 'boolean':
+            if (value === 'true' || value === '1') {
+              validated[param] = true;
+            } else if (value === 'false' || value === '0') {
+              validated[param] = false;
+            } else {
+              errors.push(`${param} must be true or false`);
+            }
+            break;
+
+          case 'enum':
+            if (!rules.values.includes(value)) {
+              errors.push(`${param} must be one of: ${rules.values.join(', ')}`);
+            } else {
+              validated[param] = value;
+            }
+            break;
+
+          case 'string':
+            validated[param] = String(value);
+            if (rules.minLength && value.length < rules.minLength) {
+              errors.push(`${param} must be at least ${rules.minLength} characters`);
+            }
+            if (rules.maxLength && value.length > rules.maxLength) {
+              errors.push(`${param} must be at most ${rules.maxLength} characters`);
+            }
+            break;
+
+          case 'date':
+            const date = new Date(value);
+            if (isNaN(date.getTime())) {
+              errors.push(`${param} must be a valid date`);
+            } else {
+              validated[param] = date.toISOString();
+            }
+            break;
+
+          default:
+            validated[param] = value;
+        }
+      } catch (error) {
+        errors.push(`${param} validation failed: ${error.message}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors
+      });
+    }
+
+    // Replace req.query with validated values
+    req.query = validated;
+    next();
+  };
+}
+
 /**
  * Validate query parameters
  * @param {Object} schema - Validation schema
@@ -383,5 +496,6 @@ module.exports = {
   validateBody,
   validateQuery,
   validateParams,
+  validateQueryParams,
   commonSchemas
 };
