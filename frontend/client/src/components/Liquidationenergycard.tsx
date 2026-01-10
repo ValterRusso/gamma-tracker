@@ -192,8 +192,10 @@ export default function LiquidationEnergyCard({ energy, className = '' }: Liquid
         </div>
         <div>
           <p className="text-xs text-slate-400 mb-1">Largest</p>
-          <p className="text-sm font-semibold text-slate-200">
-            ${(energy.rawData.largestLiquidation.value / 1000).toFixed(0)}K
+          <p className="text-sm font-semibold text-slate-200">            
+              {energy.rawData.largestLiquidation?.value 
+                ? `${(energy.rawData.largestLiquidation.value / 1000).toFixed(0)}K`
+                : 'N/A'}
           </p>
         </div>
       </div>
