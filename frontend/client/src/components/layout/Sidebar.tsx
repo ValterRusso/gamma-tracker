@@ -75,6 +75,17 @@ const navigationSections: NavSection[] = [
     ]
   },
   {
+    id: 'entropy',
+    label: 'Entropy Analysis',
+    icon: Activity,
+    items: [
+      { id: 'entropy-overview', label: 'Overview', icon: LayoutDashboard, path: '/entropy/overview', badge: 'NEW', badgeColor: 'bg-cyan-500' },
+      { id: 'entropy-divergence', label: 'Divergences', icon: TrendingUp, path: '/entropy/divergence' },
+      { id: 'entropy-depth', label: 'Depth Analysis', icon: Target, path: '/entropy/depth' },
+      { id: 'entropy-history', label: 'History', icon: LineChart, path: '/entropy/history' }
+    ]
+  },
+  {
     id: 'realtime',
     label: 'Real-Time Data',
     icon: Zap,
@@ -89,7 +100,7 @@ const navigationSections: NavSection[] = [
 export default function Sidebar() {
   const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
-  const [expandedSections, setExpandedSections] = useState<string[]>(['gamma', 'volatility', 'trading']);
+  const [expandedSections, setExpandedSections] = useState<string[]>(['gamma', 'volatility', 'trading', 'entropy']);
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => 
