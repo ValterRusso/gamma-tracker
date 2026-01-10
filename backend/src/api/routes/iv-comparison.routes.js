@@ -32,7 +32,8 @@ const router = express.Router();
 const asyncHandler = require('../middleware/asyncHandler');
 const cache = require('../middleware/cache');
 const { validateQuery, validateParams } = require('../middleware/validation');
-const IVComparisonService = require('../../services/IVComparisonService');
+const IVComparisonService = require('../../services/IvcomparisonService')
+
 
 module.exports = (dependencies) => {
   const { binanceAdapter, deribitAPI, ivComparator } = dependencies;
@@ -194,7 +195,7 @@ module.exports = (dependencies) => {
    * Query: ?dtes=1,2,3,7,30
    * Cache: 10s
    */
-  router.get('/iv-comparison/multiple',
+  router.get('/iv-compare/multiple',
     cache(10000),
     validateQuery({
       dtes: { type: 'string', required: false }
@@ -231,38 +232,52 @@ module.exports = (dependencies) => {
    * Query: ?dte=1&hours=24
    * Cache: 30s (histórico)
    */
-  router.get('/iv-comparison/history',
+  router.get('/iv-compare/history',
     cache(30000),
     validateQuery({
-      dte: { type: 'number', min: 0 },
-      hours: { type: 'number', min: 1, max: 168 }
+      hours: { type: 'int', min: 1, max: 168, default: 24 },
+      interval: { type: 'int', min: 1, max: 60, default: 5 }
     }),
-    asyncHandler(async (req, res) => {
-      const dte = req.query.dte !== undefined && req.query.dte !== '' 
-        ? parseInt(req.query.dte) 
-        : null;
-      const hours = parseInt(req.query.hours) || 24;
-      
-      const history = await ivService.getHistory(dte, hours);
+    async (req, res) => {
+      const { hours, interval } = req.query;       
+         
+      const history = await ivComparator.getHistory?.({hours, interval});
+
+      if (!history) {
+        // Se método não existe, retornar histórico básico
+        const comparison = await ivComparator.getSpreadHistory();
+        
+        res.json({
+          success: true,
+          data: {
+            history: comparison ? [comparison] : [],
+            hours,
+            interval,
+            note: 'Historical data collection not yet implemented'
+          }
+        });
+        return;
+      }
+
       
       res.json({
-        success: true,
-        filters: {
-          dte: dte,
-          hours: hours
-        },
-        count: history.length,
-        data: history
+        success: true,       
+        data: {
+          history,
+          hours,
+          interval
+        }
+
       });
-    })
-  );
+    });
+  
 
   /**
    * GET /api/iv-comparison/stats
    * Estatísticas do comparador
    * Cache: 5s
    */
-  router.get('/iv-comparison/stats', 
+  router.get('/iv-compare/stats', 
     cache(5000), 
     asyncHandler(async (req, res) => {
       const stats = await ivService.getStats();
