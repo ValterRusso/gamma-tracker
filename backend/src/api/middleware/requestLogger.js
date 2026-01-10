@@ -60,6 +60,18 @@ const requestLogger = (logger, options = {}) => {
     skip: options.skip || (() => false),
     skipPaths: options.skipPaths || ['/health'],
     
+    // 🆕 Rotas de polling que não devem logar (exceto erros)
+    pollingPaths: options.pollingPaths || [
+      '/api/orderbook',
+      '/api/metrics',
+      '/api/gex/current',
+      '/api/entropy-rsi',
+      '/api/volume',
+      '/api/volume-trend',
+      '/api/iv-comparison',
+      '/api/compare'
+    ],
+    
     // Sanitization
     sanitizeBody: options.sanitizeBody !== false,
     sanitizeHeaders: options.sanitizeHeaders !== false,
@@ -132,6 +144,16 @@ const requestLogger = (logger, options = {}) => {
       } else if (responseTime > config.slowThreshold) {
         level = 'warn';
         logData.slow = true;
+      }
+
+      // 🆕 Skip logging for successful GET requests to polling routes
+      const isPollingRoute = config.pollingPaths.some(path => req.path.startsWith(path));
+      const isGetRequest = req.method === 'GET';
+      const isSuccess = res.statusCode >= 200 && res.statusCode < 400;
+      
+      if (isPollingRoute && isGetRequest && isSuccess && responseTime < config.slowThreshold) {
+        // Skip logging - too verbose for polling routes
+        return originalEnd.apply(res, args);
       }
 
       // Log (with fallback for invalid levels)
