@@ -137,6 +137,12 @@ class GammaTracker {
       // Entropy V2
       this.entropyCalc = new EntropyCalculatorV2(this.logger);
       this.rsiCalc = new RSICalculatorV2(this.logger);
+      
+      // 🆕 Inicializar RSI Calculator com dados da Binance
+      this.logger.info('📊 Inicializando RSI Calculator...');
+      await this.rsiCalc.initialize();
+      this.logger.success('✓ RSI Calculator inicializado com dados históricos');
+      
       this.marketAnalyzer = new CombinedMarketAnalyzer(
         this.entropyCalc,
         this.rsiCalc,
