@@ -77,6 +77,7 @@ class OrderBookAnalyzer extends EventEmitter {
       depthRatio: 1,            // Vbid / Vask
       depthChange: 0,           // % mudança vs média
       depth_history: [],
+      volume_history: [],       // 🆕 Histórico de volume (últimos 60s)
       
       // Spread
       bestBid: 0,
@@ -354,6 +355,20 @@ class OrderBookAnalyzer extends EventEmitter {
     if (this.metrics.totalAskVolume > 0) {
       this.metrics.depthRatio = this.metrics.totalBidVolume / this.metrics.totalAskVolume;
     }
+    
+    // 🆕 Adicionar ao histórico de volume
+    this.metrics.volume_history.push({
+      timestamp: Date.now(),
+      totalDepth: this.metrics.totalDepth,
+      bidVolume: this.metrics.totalBidVolume,
+      askVolume: this.metrics.totalAskVolume,
+      ratio: this.metrics.depthRatio
+    });
+    
+    // Limitar tamanho do histórico (600 pontos = 60s @ 100ms)
+    if (this.metrics.volume_history.length > this.maxHistorySize) {
+      this.metrics.volume_history.shift();
+    }
   }
   
   /**
@@ -532,6 +547,7 @@ class OrderBookAnalyzer extends EventEmitter {
     this.metrics.BI_history = this.metrics.BI_history.filter(h => h.time > cutoff);
     this.metrics.depth_history = this.metrics.depth_history.filter(h => h.time > cutoff);
     this.metrics.spread_history = this.metrics.spread_history.filter(h => h.time > cutoff);
+    this.metrics.volume_history = this.metrics.volume_history.filter(h => h.timestamp > cutoff);  // 🆕
   }
   
   /**
@@ -588,6 +604,24 @@ class OrderBookAnalyzer extends EventEmitter {
       bids: bidsArray,
       asks: asksArray
     };
+  }
+  
+  /**
+   * Get bids array (for Entropy Calculator)
+   * @returns {Array} Array of [price, quantity] sorted by price descending
+   */
+  getBids() {
+    return Array.from(this.bids.entries())
+      .sort((a, b) => b[0] - a[0]);  // Ordenar por preço (maior primeiro)
+  }
+  
+  /**
+   * Get asks array (for Entropy Calculator)
+   * @returns {Array} Array of [price, quantity] sorted by price ascending
+   */
+  getAsks() {
+    return Array.from(this.asks.entries())
+      .sort((a, b) => a[0] - b[0]);  // Ordenar por preço (menor primeiro)
   }
   
   /**
@@ -664,6 +698,14 @@ class OrderBookAnalyzer extends EventEmitter {
       depth_history: this.metrics.depth_history,
       spread_history: this.metrics.spread_history
     };
+  }
+  
+  /**
+   * 🆕 Obter histórico de volume (para volume-trend endpoint)
+   * @returns {Array} Array de objetos com timestamp, totalDepth, bidVolume, askVolume, ratio
+   */
+  getVolumeHistory() {
+    return this.metrics.volume_history;
   }
   
   /**
