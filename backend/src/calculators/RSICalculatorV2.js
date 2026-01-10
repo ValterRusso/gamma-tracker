@@ -36,7 +36,7 @@ class RSICalculatorV2 extends EventEmitter {
     
     // Configuração
     this.config = {
-      symbol: config.symbol || 'btcusdt',
+      symbol: (config.symbol || 'BTCUSDT').toUpperCase(),
       interval: config.interval || '15m',
       period: config.period || 14,
       candleLimit: config.candleLimit || 100,
@@ -97,6 +97,22 @@ class RSICalculatorV2 extends EventEmitter {
       interval: this.config.interval,
       period: this.config.period
     });
+    
+    // ❌ REMOVED: this.initialize() - now called manually in index.js
+  }
+  
+  /**
+   * Initialize with first data fetch
+   */
+  async initialize() {
+    this.logger.info('[RSICalculatorV2] Fetching initial candle data...');
+    try {
+      await this.update();
+      this.logger.success('[RSICalculatorV2] Initial data loaded successfully');
+    } catch (error) {
+      this.logger.error('[RSICalculatorV2] Failed to fetch initial data:', error.message);
+      // Don't throw - let it retry on next update cycle
+    }
   }
   
   /**
