@@ -37,10 +37,10 @@ class RSICalculatorV2 extends EventEmitter {
     // Configuração
     this.config = {
       symbol: (config.symbol || 'BTCUSDT').toUpperCase(),
-      interval: config.interval || '15m',
+      interval: config.interval || '1m',
       period: config.period || 14,
       candleLimit: config.candleLimit || 100,
-      updateInterval: config.updateInterval || 900000, // 15min
+      updateInterval: config.updateInterval || 60000, // 15min
       overboughtThreshold: config.overboughtThreshold || 70,
       oversoldThreshold: config.oversoldThreshold || 30,
       binanceApiUrl: 'https://api.binance.com/api/v3/klines',
