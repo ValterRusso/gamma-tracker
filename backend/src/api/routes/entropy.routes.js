@@ -40,7 +40,7 @@ module.exports = (dependencies) => {
    */
   router.get('/entropy-rsi', 
     validateQuery({
-      depth: { type: 'number', min: 20, max: 200 }
+      depth: { type: 'number', min: 5, max: 200 }
     }),
     asyncHandler(async (req, res) => {
       const depth = req.query.depth || null;
@@ -111,7 +111,7 @@ module.exports = (dependencies) => {
    */
   router.post('/entropy/depth',
     validateBody({
-      depth: { type: 'number', required: true, min: 20, max: 200 }
+      depth: { type: 'number', required: true, min: 5, max: 200 }
     }),
     asyncHandler(async (req, res) => {
       const { depth } = req.body;

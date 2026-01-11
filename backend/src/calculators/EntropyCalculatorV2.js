@@ -41,7 +41,7 @@ class EntropyCalculatorV2 extends EventEmitter {
       // DEPTH CONFIGURATION (NOVO! 🆕)
       // ========================================================================
       defaultDepth: 80,          // 80 níveis = sweet spot!
-      minDepth: 20,              // Mínimo permitido
+      minDepth: 5,               // Mínimo permitido (ajustado para multi-depth analysis)
       maxDepth: 200,             // Máximo permitido
       currentDepth: null,        // Será set para defaultDepth
       
