@@ -67,12 +67,14 @@ class Database {
     const MarketSnapshot = require('./models/MarketSnapshot')(this.sequelize);
     const OptionsHistory = require('./models/OptionsHistory')(this.sequelize);
     const AnomaliesLog = require('./models/AnomaliesLog')(this.sequelize);
+    const GEXSnapshot = require('./models/GEXSnapshot')(this.sequelize);
     
     this.models = {
       Asset,
       MarketSnapshot,
       OptionsHistory,
-      AnomaliesLog
+      AnomaliesLog,
+      GEXSnapshot
     };
     
     // Setup associations

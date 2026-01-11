@@ -30,6 +30,7 @@ const escapeRoutes = require('./escape.routes');
 const historyRoutes = require('./history.routes');
 const ivComparisonRoutes = require('./iv-comparison.routes');
 const optionsRoutes = require('./options.routes');
+const gexHeatmapRoutes = require('./gex-heatmap.routes');
 
 module.exports = (dependencies) => {
   // Mount all routes
@@ -46,6 +47,7 @@ module.exports = (dependencies) => {
   router.use(historyRoutes(dependencies));          // 2 endpoints
   router.use(ivComparisonRoutes(dependencies));     // 13 endpoints
   router.use(optionsRoutes(dependencies));          // 4 endpoints
+  router.use(gexHeatmapRoutes(dependencies));       // 5 endpoints
   
   return router;
 };

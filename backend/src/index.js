@@ -20,6 +20,7 @@ const Logger = require('./utils/logger');
 const Database = require('./database/Database');
 const DataPersistenceService = require('./database/services/DataPersistenceService');
 const DataRetentionService = require('./database/services/DataRetentionService');
+const GEXSnapshotService = require('./database/services/GEXSnapshotService');
 
 // Data Collection
 const DataCollector = require('./collectors/DataCollector');
@@ -75,6 +76,7 @@ class GammaTracker {
     this.database = null;
     this.persistence = null;
     this.retention = null;
+    this.gexSnapshotService = null;
     this.persistenceTimer = null;
     
     // Calculators
@@ -260,6 +262,9 @@ class GammaTracker {
         deribitAPI: this.deribitAPI,
         ivComparator: this.ivComparator,
         
+        // Database Services
+        gexSnapshotService: this.gexSnapshotService,
+        
         // Config
         config: {
           port: this.config.apiPort,
@@ -296,6 +301,10 @@ class GammaTracker {
       // 3. Initialize retention service (automated cleanup every 24h)
       this.retention = new DataRetentionService(this.database);
       this.retention.startAutomatedCleanup(24);
+      
+      // 4. Initialize GEX snapshot service
+      this.gexSnapshotService = new GEXSnapshotService(this.database);
+      this.gexSnapshotService.setSnapshotInterval(60000); // 1 minute
       
       this.logger.success('✓ Database inicializado com persistência ativada');
       
@@ -411,6 +420,19 @@ class GammaTracker {
         maxPain: maxPainData,
         sentiment: sentimentData
       });
+      
+      // Save GEX snapshot for heatmap
+      if (this.gexSnapshotService) {
+        try {
+          const gexByStrike = this.gexCalculator.calculateGEXByStrike(options);
+          const saved = await this.gexSnapshotService.saveSnapshot(gexByStrike, spotPrice);
+          if (saved > 0) {
+            this.logger.debug(`✓ GEX snapshot saved: ${saved} strikes`);
+          }
+        } catch (error) {
+          this.logger.error('Erro ao salvar GEX snapshot:', error.message);
+        }
+      }
       
       this.logger.success(`✓ Snapshot salvo: ${options.length} options, ${anomalies.length} anomalias`);
       
