@@ -105,7 +105,8 @@ export default function EntropyHistory() {
 
       if (entropyData.success && entropyData.data) {
         // Filter by time range
-        const filtered = entropyData.data.history
+        // API returns array directly in data, not data.history
+        const filtered = (Array.isArray(entropyData.data) ? entropyData.data : [])
           .filter((point: any) => point.timestamp >= startTime)
           .map((point: any) => ({
             timestamp: point.timestamp,
