@@ -12,7 +12,7 @@
 // - Persistence check (N consecutive samples below threshold)
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, AlertCircle, Settings, Star, ArrowLeft } from 'lucide-react';
 import { Link } from 'wouter';
 import { 
@@ -192,7 +192,7 @@ export default function EntropyOverview() {
       };
     } catch {
       return {
-        collectionInterval: 5000,
+        collectionInterval: 30,
         maxDataPoints: 1000,
         entropyThreshold: 0.5,
         persistenceSamples: 3
@@ -214,6 +214,19 @@ export default function EntropyOverview() {
   // DATA FETCHING
   // ============================================================================
 
+  // Use refs to avoid dependency issues
+  const historyRef = useRef(history);
+  const settingsRef = useRef(settings);
+
+  // Update refs when state changes
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
   const fetchData = useCallback(async () => {
     try {
       const [entropyRes, binanceRes, statsRes] = await Promise.all([
@@ -230,19 +243,19 @@ export default function EntropyOverview() {
         setEntropyRSI(entropyData.data);
         setBinanceStats(binanceData.data);
 
-        // Detect events (persistence check)
+        // Detect events (persistence check) using refs
         const bidEvent = detectEvent(
-          history.map(h => h.bid_entropy),
+          historyRef.current.map(h => h.bid_entropy),
           entropyData.data.entropy.bid_entropy,
-          settings.entropyThreshold,
-          settings.persistenceSamples
+          settingsRef.current.entropyThreshold,
+          settingsRef.current.persistenceSamples
         );
 
         const askEvent = detectEvent(
-          history.map(h => h.ask_entropy),
+          historyRef.current.map(h => h.ask_entropy),
           entropyData.data.entropy.ask_entropy,
-          settings.entropyThreshold,
-          settings.persistenceSamples
+          settingsRef.current.entropyThreshold,
+          settingsRef.current.persistenceSamples
         );
 
         // Add new data point
@@ -260,7 +273,7 @@ export default function EntropyOverview() {
 
         setHistory(prev => {
           const updated = [...prev, newPoint];
-          return updated.slice(-settings.maxDataPoints);
+          return updated.slice(-settingsRef.current.maxDataPoints);
         });
       }
 
@@ -276,7 +289,7 @@ export default function EntropyOverview() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // No dependencies - stable function
 
   // Auto-refresh with configurable interval
   useEffect(() => {
@@ -284,7 +297,6 @@ export default function EntropyOverview() {
     const interval = setInterval(fetchData, settings.collectionInterval * 1000);
     return () => clearInterval(interval);
   }, [settings.collectionInterval, fetchData]); // Only re-run when interval changes
-
 
   // ============================================================================
   // EVENT DETECTION
