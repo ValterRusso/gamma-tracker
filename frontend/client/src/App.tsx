@@ -18,6 +18,7 @@ import StrategyCenter from "./pages/StrategyCenter";
 import MarketMicrostructureDashboard from "./pages/Marketmicrostructuredashboard";
 import EntropyOverview from "./pages/EntropyOverview";
 import EntropyDivergences from "./pages/EntropyDivergences";
+import EntropyDepthAnalysis from "./pages/EntropyDepthAnalysis";
 
 function Router() {
   return (
@@ -44,6 +45,7 @@ function Router() {
         {/* Entropy Analysis */}
         <Route path="/entropy/overview" component={EntropyOverview} /> 
         <Route path="/entropy/divergences" component={EntropyDivergences} />
+        <Route path="/entropy/depth" component={EntropyDepthAnalysis} />
 
         {/* Real-Time Data */}
         {/* TODO: Uncomment when pages are created
