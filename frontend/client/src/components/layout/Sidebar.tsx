@@ -80,7 +80,7 @@ const navigationSections: NavSection[] = [
     icon: Activity,
     items: [
       { id: 'entropy-overview', label: 'Overview', icon: LayoutDashboard, path: '/entropy/overview', badge: 'NEW', badgeColor: 'bg-cyan-500' },
-      { id: 'entropy-divergence', label: 'Divergences', icon: TrendingUp, path: '/entropy/divergence' },
+      { id: 'entropy-divergence', label: 'Divergences', icon: TrendingUp, path: '/entropy/divergences' },
       { id: 'entropy-depth', label: 'Depth Analysis', icon: Target, path: '/entropy/depth' },
       { id: 'entropy-history', label: 'History', icon: LineChart, path: '/entropy/history' }
     ]
