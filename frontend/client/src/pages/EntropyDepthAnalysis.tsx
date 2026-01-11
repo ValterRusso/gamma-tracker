@@ -43,8 +43,15 @@ interface DepthSettings {
 // ============================================================================
 
 export default function EntropyDepthAnalysis() {
-  // State
-  const [snapshots, setSnapshots] = useState<DepthSnapshot[]>([]);
+  // State with localStorage persistence
+  const [snapshots, setSnapshots] = useState<DepthSnapshot[]>(() => {
+    try {
+      const saved = localStorage.getItem('entropy_depth_snapshots');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -84,6 +91,13 @@ export default function EntropyDepthAnalysis() {
   useEffect(() => {
     localStorage.setItem('depthAnalysisSettings', JSON.stringify(settings));
   }, [settings]);
+
+  // Save snapshots to localStorage
+  useEffect(() => {
+    if (snapshots.length > 0) {
+      localStorage.setItem('entropy_depth_snapshots', JSON.stringify(snapshots));
+    }
+  }, [snapshots]);
 
   // ============================================================================
   // DATA FETCHING

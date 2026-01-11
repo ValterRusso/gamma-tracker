@@ -69,9 +69,24 @@ interface Settings {
 // ============================================================================
 
 export default function EntropyDivergences() {
-  // State
-  const [history, setHistory] = useState<HistoryPoint[]>([]);
-  const [divergences, setDivergences] = useState<Divergence[]>([]);
+  // State with localStorage persistence
+  const [history, setHistory] = useState<HistoryPoint[]>(() => {
+    try {
+      const saved = localStorage.getItem('entropy_divergences_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  
+  const [divergences, setDivergences] = useState<Divergence[]>(() => {
+    try {
+      const saved = localStorage.getItem('entropy_divergences_data');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -119,6 +134,20 @@ export default function EntropyDivergences() {
   useEffect(() => {
     localStorage.setItem('divergenceSettings', JSON.stringify(settings));
   }, [settings]);
+
+  // Save history to localStorage
+  useEffect(() => {
+    if (history.length > 0) {
+      localStorage.setItem('entropy_divergences_history', JSON.stringify(history));
+    }
+  }, [history]);
+
+  // Save divergences to localStorage
+  useEffect(() => {
+    if (divergences.length > 0) {
+      localStorage.setItem('entropy_divergences_data', JSON.stringify(divergences));
+    }
+  }, [divergences]);
 
   // ============================================================================
   // PIVOT DETECTION
