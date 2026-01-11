@@ -335,17 +335,17 @@ export default function GEXHeatmap() {
               <div className="space-y-2">
                 {strikePanelData.slice(0, 20).map((strike) => (
                   <div key={strike.strike} className="flex items-center gap-2">
-                    <span className="text-sm text-slate-400 w-20">${strike.strike.toFixed(0)}</span>
+                    <span className="text-sm text-slate-400 w-20">${Number(strike.strike).toFixed(0)}</span>
                     <div className="flex-1 h-6 bg-white/5 rounded overflow-hidden">
                       <div
                         className="h-full bg-linear-to-r from-purple-500 to-pink-500"
                         style={{
-                          width: `${Math.min(100, Math.abs(strike.totalGex) / 1000000)}%`
+                          width: `${Math.min(100, Math.abs(Number(strike.totalGex)) / 1000000)}%`
                         }}
                       />
                     </div>
                     <span className="text-xs text-slate-500 w-16 text-right">
-                      {(strike.totalGex / 1000000).toFixed(1)}M
+                      {(Number(strike.totalGex) / 1000000).toFixed(1)}M
                     </span>
                   </div>
                 ))}
@@ -359,7 +359,7 @@ export default function GEXHeatmap() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-400">Spot Price</span>
                   <span className="text-lg font-semibold text-green-400">
-                    ${spotPrice.toFixed(2)}
+                    ${Number(spotPrice).toFixed(2)}
                   </span>
                 </div>
               </div>
