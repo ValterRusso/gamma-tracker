@@ -22,8 +22,11 @@ class EntropyService {
    * Get entropy com RSI
    */
   async getEntropy(customDepth = null) {
+    // Parse depth to number (query params come as strings)
+    const depth = customDepth ? parseInt(customDepth, 10) : null;
+    
     // Validate depth
-    if (customDepth && (customDepth < 5 || customDepth > 200)) {
+    if (depth && (depth < 5 || depth > 200 || isNaN(depth))) {
       throw new Error('Depth must be between 5 and 200');
     }
 
@@ -35,15 +38,15 @@ class EntropyService {
       throw new Error('Orderbook not available');
     }
 
-    // Calculate entropy with custom depth
-    const entropyResult = this.entropyCalc.calculate(bids, asks, customDepth);
+    // Calculate entropy with custom depth (now as number)
+    const entropyResult = this.entropyCalc.calculate(bids, asks, depth);
 
     // Get RSI metrics
     const rsiMetrics = this.rsiCalc.getMetrics();
 
     // If custom depth was provided, return the direct result
     // Otherwise use getMetrics() for full historical data
-    const entropyMetrics = customDepth ? entropyResult : this.entropyCalc.getMetrics();
+    const entropyMetrics = depth ? entropyResult : this.entropyCalc.getMetrics();
 
     return {
       entropy: entropyMetrics,
