@@ -91,45 +91,29 @@ export default function EntropyDepthAnalysis() {
 
   const fetchDepthData = useCallback(async () => {
     try {
-      console.log('[DepthAnalysis] Fetching data for depths:', settingsRef.current.depths);
+      console.log('[DepthAnalysis] Fetching multi-depth data for:', settingsRef.current.depths);
 
-      // Fetch entropy data for each depth
-      const depthPromises = settingsRef.current.depths.map(async (depth) => {
-        const res = await fetch(`http://localhost:3300/api/entropy-rsi?depth=${depth}`);
-        const data = await res.json();
-        
-        if (data.success && data.data) {
-          return {
-            depth,
-            bid_entropy: data.data.entropy.bid_entropy,
-            ask_entropy: data.data.entropy.ask_entropy,
-            avg_entropy: (data.data.entropy.bid_entropy + data.data.entropy.ask_entropy) / 2,
-            bid_liquidity: data.data.entropy.bid_liquidity || 0,
-            ask_liquidity: data.data.entropy.ask_liquidity || 0
-          };
-        }
-        return null;
-      });
+      // ✨ NEW: Single request for all depths!
+      const depthsParam = settingsRef.current.depths.join(',');
+      const res = await fetch(`http://localhost:3300/api/entropy/multi-depth?depths=${depthsParam}`);
+      const response = await res.json();
 
-      const results = await Promise.all(depthPromises);
-      const validResults = results.filter(r => r !== null);
-
-      if (validResults.length > 0) {
+      if (response.success && response.data) {
         const snapshot: DepthSnapshot = {
           timestamp: Date.now(),
           depths: {}
         };
 
-        validResults.forEach(result => {
-          if (result) {
-            snapshot.depths[result.depth] = {
-              bid_entropy: result.bid_entropy,
-              ask_entropy: result.ask_entropy,
-              avg_entropy: result.avg_entropy,
-              bid_liquidity: result.bid_liquidity,
-              ask_liquidity: result.ask_liquidity
-            };
-          }
+        // Process multi-depth results
+        Object.entries(response.data).forEach(([depthStr, data]: [string, any]) => {
+          const depth = parseInt(depthStr, 10);
+          snapshot.depths[depth] = {
+            bid_entropy: data.bid_entropy,
+            ask_entropy: data.ask_entropy,
+            avg_entropy: data.avg_entropy,
+            bid_liquidity: data.bid_liquidity,
+            ask_liquidity: data.ask_liquidity
+          };
         });
 
         setSnapshots(prev => {
@@ -138,6 +122,9 @@ export default function EntropyDepthAnalysis() {
         });
 
         setError(null);
+        console.log('[DepthAnalysis] Multi-depth data received:', Object.keys(response.data));
+      } else {
+        throw new Error(response.error || 'Failed to fetch multi-depth data');
       }
 
       setLoading(false);

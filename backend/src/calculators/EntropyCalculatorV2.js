@@ -394,6 +394,90 @@ class EntropyCalculatorV2 extends EventEmitter {
   }
   
   /**
+   * ========================================================================
+   * MULTI-DEPTH CALCULATION (NEW! 🆕)
+   * ========================================================================
+   * Calculate entropy at multiple depths in a single pass
+   * Enables sweet spot detection and asset profiling
+   */
+  
+  /**
+   * Calculate entropy at multiple depths
+   * @param {Map|Array} bids - Bids do order book
+   * @param {Map|Array} asks - Asks do order book
+   * @param {Array<number>} depths - Array of depths to calculate [5, 10, 20, 50, 80, 100]
+   * @returns {Object} - { 5: {...}, 10: {...}, 20: {...}, ... }
+   */
+  calculateMultiDepth(bids, asks, depths = [5, 10, 20, 50, 80, 100]) {
+    try {
+      const timestamp = Date.now();
+      const results = {};
+      
+      // Extract volumes once
+      const bidVolumes = this._extractVolumes(bids);
+      const askVolumes = this._extractVolumes(asks);
+      
+      // Calculate for each depth
+      for (const depth of depths) {
+        // Validate depth
+        if (depth < this.config.minDepth || depth > this.config.maxDepth) {
+          this.logger.warn(`[EntropyCalculatorV2] Depth ${depth} out of range, skipping`);
+          continue;
+        }
+        
+        // Slice volumes at this depth
+        const bidSlice = bidVolumes.slice(0, depth);
+        const askSlice = askVolumes.slice(0, depth);
+        
+        // Calculate entropies (raw bits)
+        const bid_entropy = this.calculateShannon(bidSlice);
+        const ask_entropy = this.calculateShannon(askSlice);
+        
+        // Calculate max entropy for this depth
+        const max_entropy = Math.log2(depth);
+        
+        // Calculate normalized values (0-1)
+        const bid_normalized = max_entropy > 0 ? bid_entropy / max_entropy : 0;
+        const ask_normalized = max_entropy > 0 ? ask_entropy / max_entropy : 0;
+        const avg_entropy = (bid_entropy + ask_entropy) / 2;
+        const avg_normalized = (bid_normalized + ask_normalized) / 2;
+        
+        // Calculate ratio
+        const ratio = ask_entropy > 0 ? bid_entropy / ask_entropy : 1;
+        
+        // Calculate liquidity
+        const bid_liquidity = bidSlice.reduce((sum, v) => sum + v, 0);
+        const ask_liquidity = askSlice.reduce((sum, v) => sum + v, 0);
+        
+        // Store result for this depth
+        results[depth] = {
+          bid_entropy,
+          ask_entropy,
+          avg_entropy,
+          bid_normalized,
+          ask_normalized,
+          avg_normalized,
+          ratio,
+          bid_liquidity,
+          ask_liquidity,
+          total_liquidity: bid_liquidity + ask_liquidity,
+          depth_used: depth,
+          max_entropy,
+          timestamp
+        };
+      }
+      
+      this.logger.info(`[EntropyCalculatorV2] Multi-depth calculated for ${depths.length} levels`);
+      
+      return results;
+      
+    } catch (error) {
+      this.logger.error('[EntropyCalculatorV2] Erro ao calcular multi-depth:', error);
+      return {};
+    }
+  }
+  
+  /**
    * Extrair volumes de bids/asks
    * @private
    */

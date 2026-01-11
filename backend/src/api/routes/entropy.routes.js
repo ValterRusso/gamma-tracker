@@ -137,6 +137,54 @@ module.exports = (dependencies) => {
   }));
 
   /**
+   * GET /api/entropy/multi-depth
+   * Calculate entropy at multiple depths in a single request
+   * Query params: depths (comma-separated, e.g., "5,10,20,50,80,100")
+   */
+  router.get('/entropy/multi-depth', asyncHandler(async (req, res) => {
+    // Parse depths from query param
+    let depths = [5, 10, 20, 50, 80, 100]; // Default depths
+    
+    if (req.query.depths) {
+      depths = req.query.depths
+        .split(',')
+        .map(d => parseInt(d.trim(), 10))
+        .filter(d => !isNaN(d) && d >= 5 && d <= 200);
+    }
+    
+    if (depths.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid depths parameter. Must be comma-separated numbers between 5 and 200.'
+      });
+    }
+    
+    // Get orderbook
+    const bids = orderbook.getBids();
+    const asks = orderbook.getAsks();
+    
+    if (!bids || !asks) {
+      return res.status(503).json({
+        success: false,
+        error: 'Orderbook not available'
+      });
+    }
+    
+    // Calculate multi-depth
+    const results = entropyCalc.calculateMultiDepth(bids, asks, depths);
+    
+    res.json({
+      success: true,
+      data: results,
+      meta: {
+        depths_requested: depths,
+        depths_calculated: Object.keys(results).map(k => parseInt(k, 10)),
+        timestamp: Date.now()
+      }
+    });
+  }));
+
+  /**
    * POST /api/entropy/asset
    * Trocar asset (aplica profile)
    */
