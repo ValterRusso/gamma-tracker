@@ -141,6 +141,7 @@ class GammaTracker {
       // 🆕 Inicializar RSI Calculator com dados da Binance
       this.logger.info('📊 Inicializando RSI Calculator...');
       await this.rsiCalc.initialize();
+      this.rsiCalc.start();
       this.logger.success('✓ RSI Calculator inicializado com dados históricos');
       
       this.marketAnalyzer = new CombinedMarketAnalyzer(
