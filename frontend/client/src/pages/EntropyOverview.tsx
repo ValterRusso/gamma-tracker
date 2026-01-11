@@ -227,17 +227,38 @@ export default function EntropyOverview() {
     settingsRef.current = settings;
   }, [settings]);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [entropyRes, binanceRes, statsRes] = await Promise.all([
-        fetch('http://localhost:3300/api/entropy-rsi'),
-        fetch('http://localhost:3300/api/binance/stats'),
-        fetch('http://localhost:3300/api/entropy/stats')
-      ]);
+  const fetchData = useCallback(async (retries = 3) => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`[Entropy] Fetch attempt ${attempt}/${retries} at`, new Date().toISOString());
+        
+        const [entropyRes, binanceRes, statsRes] = await Promise.all([
+          fetch('http://localhost:3300/api/entropy-rsi'),
+          fetch('http://localhost:3300/api/binance/stats'),
+          fetch('http://localhost:3300/api/entropy/stats')
+        ]);
 
-      const entropyData: EntropyRSIResponse = await entropyRes.json();
-      const binanceData: BinanceStatsResponse = await binanceRes.json();
-      const statsData: EntropyStatsResponse = await statsRes.json();
+        console.log('[Entropy] Response statuses:', {
+          entropy: entropyRes.status,
+          binance: binanceRes.status,
+          stats: statsRes.status
+        });
+
+        if (!entropyRes.ok || !binanceRes.ok || !statsRes.ok) {
+          throw new Error(`HTTP Error: entropy=${entropyRes.status}, binance=${binanceRes.status}, stats=${statsRes.status}`);
+        }
+
+        const entropyData: EntropyRSIResponse = await entropyRes.json();
+        const binanceData: BinanceStatsResponse = await binanceRes.json();
+        const statsData: EntropyStatsResponse = await statsRes.json();
+        
+        console.log('[Entropy] Data received:', {
+          bid_entropy: entropyData.data?.entropy.bid_entropy,
+          ask_entropy: entropyData.data?.entropy.ask_entropy,
+          price: binanceData.data?.spotPrice,
+          volume: entropyData.data?.rsi.volume.current,
+          historyLength: historyRef.current.length
+        });
 
       if (entropyData.success && entropyData.data && binanceData.success && binanceData.data) {
         setEntropyRSI(entropyData.data);
@@ -281,13 +302,28 @@ export default function EntropyOverview() {
         setEntropyStats(statsData.data);
       }
 
-      setLastUpdate(new Date());
-      setError(null);
-    } catch (err) {
-      setError('Erro de conexão com o backend');
-      console.error('Fetch error:', err);
-    } finally {
-      setLoading(false);
+        setLastUpdate(new Date());
+        setError(null);
+        console.log('[Entropy] Update successful, history length:', historyRef.current.length);
+        return; // Success! Exit retry loop
+        
+      } catch (err) {
+        console.error(`[Entropy] Fetch attempt ${attempt}/${retries} failed:`, err);
+        
+        if (attempt === retries) {
+          // Last attempt failed
+          setError(`Failed to fetch data after ${retries} attempts`);
+          console.error('[Entropy] All retry attempts exhausted');
+        } else {
+          // Wait before retrying
+          console.log(`[Entropy] Waiting 2s before retry ${attempt + 1}...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } finally {
+        if (attempt === retries) {
+          setLoading(false);
+        }
+      }
     }
   }, []); // No dependencies - stable function
 
@@ -297,6 +333,24 @@ export default function EntropyOverview() {
     const interval = setInterval(fetchData, settings.collectionInterval * 1000);
     return () => clearInterval(interval);
   }, [settings.collectionInterval, fetchData]); // Only re-run when interval changes
+
+  // Heartbeat monitoring - detect stale data
+  useEffect(() => {
+    const checkStale = setInterval(() => {
+      const now = Date.now();
+      const timeSinceUpdate = now - lastUpdate.getTime();
+      const expectedInterval = settings.collectionInterval * 1000;
+      
+      // If no update for 2x the expected interval
+      if (timeSinceUpdate > expectedInterval * 2) {
+        console.warn('[Entropy] Data stale! Last update:', lastUpdate.toISOString(), 'Time since:', Math.floor(timeSinceUpdate / 1000), 's');
+        console.log('[Entropy] Forcing data refresh...');
+        fetchData();
+      }
+    }, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(checkStale);
+  }, [lastUpdate, settings.collectionInterval, fetchData]);
 
   // ============================================================================
   // EVENT DETECTION
@@ -354,7 +408,7 @@ export default function EntropyOverview() {
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <p className="text-red-400 mb-4">{error || 'Dados não disponíveis'}</p>
           <button
-            onClick={fetchData}
+            onClick={() => fetchData()}
             className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors"
           >
             Tentar Novamente
@@ -659,7 +713,10 @@ export default function EntropyOverview() {
             📈 Entropy + Price (Dual Axis) {bidEventMarkers.length + askEventMarkers.length > 0 && '⭐'}
           </h2>
           <ResponsiveContainer width="100%" height={350}>
-            <ComposedChart data={dualAxisData}>
+            <ComposedChart 
+              key={`entropy-chart-${history.length}`}
+              data={dualAxisData.slice(-500)}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
               <XAxis 
                 dataKey="timestamp" 
@@ -754,8 +811,10 @@ export default function EntropyOverview() {
             📊 Volume + RSI (Event Highlighting)
           </h2>
           <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={volumeData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <ComposedChart 
+              key={`volume-chart-${history.length}`}
+              data={volumeData.slice(-500)}
+            >              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
               <XAxis 
                 dataKey="timestamp" 
                 stroke="#64748b"
