@@ -517,6 +517,28 @@ export default function EntropyOverview() {
               🧮 Entropy Analysis V2.0
             </h1>
           </div>
+          <div className="flex items-center gap-2 mt-3">
+            <Link href="/entropy/overview">
+              <button className="px-3 py-1.5 bg-cyan-500 text-white rounded-lg text-sm">
+                Overview
+              </button>
+            </Link>
+            <Link href="/entropy/divergences">
+              <button className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">
+                Divergences
+              </button>
+            </Link>
+            <Link href="/entropy/depth">
+              <button className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">
+                Depth Analysis
+              </button>
+            </Link>
+            <Link href="/entropy/history">
+              <button className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">
+                History
+              </button>
+            </Link>
+          </div>
           <p className="text-slate-400">
             Real-time order book entropy analysis for {entropy.depth_info.asset.toUpperCase()}
           </p>
