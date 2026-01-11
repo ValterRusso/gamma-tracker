@@ -183,6 +183,13 @@ const validateQuery = (schema) => {
     // Coerce query param types
     req.query = coerceQueryTypes(req.query, schema);
     
+    // Apply defaults for undefined values
+    for (const [field, rules] of Object.entries(schema)) {
+      if ((req.query[field] === undefined || req.query[field] === null) && rules.default !== undefined) {
+        req.query[field] = rules.default;
+      }
+    }
+    
     const errors = validateObject(req.query, schema, 'query');
     
     if (errors.length > 0) {
@@ -451,14 +458,22 @@ function coerceQueryTypes(query, schema) {
   for (const [field, rules] of Object.entries(schema)) {
     let value = coerced[field];
     
+    // Skip if undefined or null
     if (value === undefined || value === null) {
       continue;
     }
     
+    // Skip empty strings - let validation handle it
+    if (value === '') {
+      coerced[field] = undefined;
+      continue;
+    }
+    
     // Coerce based on expected type
-    if (rules.type === 'number') {
-      const num = parseFloat(value);
-      coerced[field] = isNaN(num) ? value : num;
+    if (rules.type === 'number' || rules.type === 'int') {
+      const num = rules.type === 'int' ? parseInt(value, 10) : parseFloat(value);
+      // If conversion fails, set to undefined (let validation use default or reject)
+      coerced[field] = isNaN(num) ? undefined : num;
     }
     
     if (rules.type === 'boolean') {
