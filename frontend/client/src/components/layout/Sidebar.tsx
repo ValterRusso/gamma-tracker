@@ -49,7 +49,7 @@ const navigationSections: NavSection[] = [
     icon: Activity,
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
-      { id: 'gamma-profile', label: 'Gamma Profile', icon: TrendingUp, path: '/gamma-profile' },
+      { id: 'GEXHeatmap', label: 'GEXHeatmap', icon: TrendingUp, path: '/gex-heatmap' },
       { id: 'wall-zones', label: 'Wall Zones', icon: Shield, path: '/wall-zones' },
       { id: 'max-pain', label: 'Max Pain', icon: Target, path: '/max-pain' }
     ]
