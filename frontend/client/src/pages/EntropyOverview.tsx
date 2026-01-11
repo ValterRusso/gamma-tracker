@@ -304,6 +304,7 @@ export default function EntropyOverview() {
 
         setLastUpdate(new Date());
         setError(null);
+        setLoading(false); // Clear loading state on success
         console.log('[Entropy] Update successful, history length:', historyRef.current.length);
         return; // Success! Exit retry loop
         
