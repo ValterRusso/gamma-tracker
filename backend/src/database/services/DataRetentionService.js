@@ -46,6 +46,7 @@ class DataRetentionService {
       
       const results = {
         snapshots: 0,
+        gexSnapshots: 0,
         options: 0,
         anomalies: 0
       };
@@ -53,13 +54,16 @@ class DataRetentionService {
       // 1. Clean old snapshots (CASCADE will delete related options)
       results.snapshots = await this.cleanOldSnapshots();
       
-      // 2. Clean old anomalies (by severity)
+      // 2. Clean old GEX snapshots
+      results.gexSnapshots = await this.cleanGEXSnapshots();
+      
+      // 3. Clean old anomalies (by severity)
       results.anomalies = await this.cleanOldAnomalies();
       
       // 3. Log statistics
       await this.logRetentionStats();
       
-      this.logger.info(`Limpeza concluída: ${results.snapshots} snapshots, ${results.anomalies} anomalias removidos`);
+      this.logger.info(`Limpeza concluída: ${results.snapshots} market snapshots, ${results.gexSnapshots} GEX snapshots, ${results.anomalies} anomalias removidos`);
       
       return results;
     } catch (error) {
@@ -84,6 +88,28 @@ class DataRetentionService {
     });
     
     this.logger.info(`${deleted} snapshots antigos removidos (> ${this.policies.detailedSnapshots} dias)`);
+    
+    return deleted;
+  }
+  
+  async cleanGEXSnapshots() {
+    const GEXSnapshot = this.db.getModel('GEXSnapshot');
+    
+    // Calculate cutoff time (7 days ago)
+    const retentionDays = this.policies.detailedSnapshots; // 7 days
+    const cutoffTime = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
+    
+    const deleted = await GEXSnapshot.destroy({
+      where: {
+        timestamp: {
+          [Op.lt]: cutoffTime
+        }
+      }
+    });
+    
+    if (deleted > 0) {
+      this.logger.info(`Deleted ${deleted} old GEX snapshots (older than ${retentionDays} days)`);
+    }
     
     return deleted;
   }
