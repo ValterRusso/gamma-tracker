@@ -66,10 +66,10 @@ module.exports = (dependencies) => {
    */
   router.get('/entropy/events',
     validateQuery({
-      limit: { type: 'number', min: 1, max: 50, default: 5 }
+      limit: { type: 'string', min: 1, max: 100, default: 5 }
     }),
     asyncHandler(async (req, res) => {
-      const limit = req.query.limit;
+      const limit = parseInt(req.query.limit);      
       const type = req.query.type || null;
       
       const events = await entropyService.getEvents(limit, type);
@@ -84,10 +84,11 @@ module.exports = (dependencies) => {
    */
   router.get('/entropy/history',
     validateQuery({
-      limit: { type: 'number', min: 1, max: 1000, default: 100 }
+      limit: { type: 'string', min: 1, max: 1000, default: 100 }
     }),
     asyncHandler(async (req, res) => {
-      const limit = req.query.limit;
+      
+      const limit = parseInt(req.query.limit);
       
       const history = await entropyService.getHistory(limit);
       
