@@ -95,7 +95,7 @@ export default function EntropyDepthAnalysis() {
 
       // Fetch entropy data for each depth
       const depthPromises = settingsRef.current.depths.map(async (depth) => {
-        const res = await fetch(`http://localhost:3300/api/entropy?depth=${depth}`);
+        const res = await fetch(`http://localhost:3300/api/entropy-rsi?depth=${depth}`);
         const data = await res.json();
         
         if (data.success && data.data) {
