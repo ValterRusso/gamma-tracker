@@ -231,7 +231,7 @@ export default function GEXHeatmap() {
     } else {
       acc.push({
         strike: point.strike,
-        totalGex: point.totalGex,
+        totalGex: Number(point.totalGex),
         callGex: point.callGex,
         putGex: point.putGex,
         totalOi: point.totalOi
@@ -246,7 +246,7 @@ export default function GEXHeatmap() {
 
   if (loading && heatmapData.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+      <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-96">
             <div className="text-center">
@@ -261,7 +261,7 @@ export default function GEXHeatmap() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+      <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
             <p className="text-red-400">Error: {error}</p>
@@ -278,8 +278,8 @@ export default function GEXHeatmap() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
-      <div className="max-w-[1800px] mx-auto space-y-6">
+    <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+      <div className="max-w-450 mx-auto space-y-6">
         
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -347,7 +347,7 @@ export default function GEXHeatmap() {
                     <span className="text-sm text-slate-400 w-20">${Number(strike.strike).toFixed(0)}</span>
                     <div className="flex-1 h-6 bg-white/5 rounded overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                        className="h-full bg-linear-to-r from-purple-500 to-pink-500"
                         style={{
                           width: `${Math.min(100, Math.abs(Number(strike.totalGex)) / 1000000)}%`
                         }}
@@ -499,7 +499,7 @@ export default function GEXHeatmap() {
                 </ScatterChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[500px] flex items-center justify-center border border-white/5 rounded-lg">
+              <div className="h-125 flex items-center justify-center border border-white/5 rounded-lg">
                 <p className="text-slate-500">No heatmap data available</p>
               </div>
             )}
