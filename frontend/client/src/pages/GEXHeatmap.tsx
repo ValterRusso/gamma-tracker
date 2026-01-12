@@ -417,12 +417,14 @@ export default function GEXHeatmap() {
                       <div
                         className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
                         style={{
-                          width: `${Math.min(100, Math.abs(Number(strike.totalGex)) / 1000000)}%`
+                          width: `${Math.min(100, Math.abs(Number(strike.totalGex)) / 100)}%`
                         }}
                       />
                     </div>
-                    <span className="text-xs text-slate-500 w-16 text-right">
-                      {(Number(strike.totalGex) / 1000000).toFixed(1)}M
+                    <span className="text-xs text-slate-500 w-20 text-right">
+                      {Math.abs(Number(strike.totalGex)) >= 1000 
+                        ? `${(Number(strike.totalGex) / 1000).toFixed(1)}K`
+                        : Number(strike.totalGex).toFixed(1)}
                     </span>
                   </div>
                 ))}
