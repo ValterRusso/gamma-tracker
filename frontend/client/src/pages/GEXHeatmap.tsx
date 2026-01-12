@@ -237,7 +237,7 @@ export default function GEXHeatmap() {
 
   if (loading && heatmapData.length === 0) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-96">
             <div className="text-center">
@@ -252,7 +252,7 @@ export default function GEXHeatmap() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
             <p className="text-red-400">Error: {error}</p>
@@ -269,8 +269,8 @@ export default function GEXHeatmap() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
-      <div className="max-w-450 mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+      <div className="max-w-[1800px] mx-auto space-y-6">
         
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -338,7 +338,7 @@ export default function GEXHeatmap() {
                     <span className="text-sm text-slate-400 w-20">${Number(strike.strike).toFixed(0)}</span>
                     <div className="flex-1 h-6 bg-white/5 rounded overflow-hidden">
                       <div
-                        className="h-full bg-linear-to-r from-purple-500 to-pink-500"
+                        className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
                         style={{
                           width: `${Math.min(100, Math.abs(Number(strike.totalGex)) / 1000000)}%`
                         }}
@@ -377,9 +377,123 @@ export default function GEXHeatmap() {
               )}
             </h3>
             
-            <div className="h-125 flex items-center justify-center border border-white/5 rounded-lg">
-              <p className="text-slate-500">Heatmap visualization coming soon...</p>
-            </div>
+            {heatmapData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={500}>
+                <ScatterChart
+                  margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
+                  
+                  <XAxis
+                    type="number"
+                    dataKey="timestamp"
+                    name="Time"
+                    domain={['dataMin', 'dataMax']}
+                    tickFormatter={(ts) => new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    stroke="#94a3b8"
+                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    label={{ value: 'Time', position: 'insideBottom', offset: -10, fill: '#94a3b8' }}
+                  />
+                  
+                  <YAxis
+                    type="number"
+                    dataKey="strike"
+                    name="Strike"
+                    domain={['dataMin', 'dataMax']}
+                    tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
+                    stroke="#94a3b8"
+                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    label={{ value: 'Strike Price', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+                  />
+                  
+                  <Tooltip
+                    cursor={{ strokeDasharray: '3 3' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-slate-900/95 backdrop-blur-sm border border-white/20 rounded-lg p-3 shadow-xl">
+                            <p className="text-white font-semibold mb-2">
+                              ${Number(data.strike).toFixed(0)}
+                            </p>
+                            <p className="text-sm text-slate-300">
+                              {new Date(data.timestamp).toLocaleString()}
+                            </p>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-xs text-purple-400">
+                                Total GEX: {(Number(data.totalGex) / 1000000).toFixed(2)}M
+                              </p>
+                              <p className="text-xs text-green-400">
+                                Call GEX: {(Number(data.callGex) / 1000000).toFixed(2)}M
+                              </p>
+                              <p className="text-xs text-red-400">
+                                Put GEX: {(Number(data.putGex) / 1000000).toFixed(2)}M
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  
+                  <Scatter
+                    data={heatmapData}
+                    fill="#8b5cf6"
+                    shape={(props: any) => {
+                      const { cx, cy, payload } = props;
+                      const gexValue = Math.abs(Number(payload.totalGex));
+                      const maxGex = Math.max(...heatmapData.map(d => Math.abs(Number(d.totalGex))));
+                      const intensity = gexValue / maxGex;
+                      
+                      // Color gradient: purple (high) → pink (medium) → red (low)
+                      let color;
+                      if (intensity > 0.7) {
+                        color = '#a855f7'; // Purple
+                      } else if (intensity > 0.4) {
+                        color = '#ec4899'; // Pink
+                      } else if (intensity > 0.2) {
+                        color = '#f43f5e'; // Rose
+                      } else {
+                        color = '#ef4444'; // Red
+                      }
+                      
+                      const size = 4 + (intensity * 8); // Size based on intensity
+                      
+                      return (
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={size}
+                          fill={color}
+                          fillOpacity={0.6 + (intensity * 0.4)}
+                          stroke={color}
+                          strokeWidth={1}
+                          strokeOpacity={0.8}
+                        />
+                      );
+                    }}
+                  />
+                  
+                  {/* Price line overlay */}
+                  {settings.showPrice && spotPrice && (
+                    <Line
+                      type="monotone"
+                      dataKey="spotPrice"
+                      data={timestamps.map(ts => ({ timestamp: ts, spotPrice }))}
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      dot={false}
+                      strokeDasharray="5 5"
+                    />
+                  )}
+                </ScatterChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[500px] flex items-center justify-center border border-white/5 rounded-lg">
+                <p className="text-slate-500">No heatmap data available</p>
+              </div>
+            )}
           </div>
         </div>
 
