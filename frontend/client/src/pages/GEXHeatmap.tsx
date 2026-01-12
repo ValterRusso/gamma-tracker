@@ -241,11 +241,27 @@ export default function GEXHeatmap() {
     const strike = Number(d.strike);
     return strike >= minStrike && strike <= maxStrike;
   });
+  
+  // CRITICAL: Convert all string values to numbers for Recharts
+  const processedHeatmapData = filteredHeatmapData.map(d => ({
+    timestamp: Number(d.timestamp),
+    strike: Number(d.strike),
+    totalGex: Number(d.totalGex),
+    callGex: Number(d.callGex),
+    putGex: Number(d.putGex),
+    callOi: Number(d.callOi),
+    putOi: Number(d.putOi),
+    totalOi: Number(d.totalOi),
+    spotPrice: Number(d.spotPrice)
+  }));
+  
   console.log('[GEXHeatmap] Filtered data:', {
     minStrike,
     maxStrike,
     filteredLength: filteredHeatmapData.length,
-    originalLength: heatmapData.length
+    originalLength: heatmapData.length,
+    processedLength: processedHeatmapData.length,
+    firstProcessed: processedHeatmapData[0]
   });
 
   // Get strike panel data (aggregate across time)
@@ -476,12 +492,12 @@ export default function GEXHeatmap() {
                   />
                   
                   <Scatter
-                    data={filteredHeatmapData}
+                    data={processedHeatmapData}
                     fill="#8b5cf6"
                     shape={(props: any) => {
                       const { cx, cy, payload } = props;
-                      const gexValue = Math.abs(Number(payload.totalGex));
-                      const maxGex = Math.max(...filteredHeatmapData.map(d => Math.abs(Number(d.totalGex))));
+                      const gexValue = Math.abs(payload.totalGex);
+                      const maxGex = Math.max(...processedHeatmapData.map(d => Math.abs(d.totalGex)));
                       const intensity = gexValue / maxGex;
                       
                       // Color gradient: purple (high) → pink (medium) → red (low)
