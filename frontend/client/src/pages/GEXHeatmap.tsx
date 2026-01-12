@@ -266,6 +266,11 @@ export default function GEXHeatmap() {
 
   // Get strike panel data (aggregate across time)
   // IMPORTANT: Convert strings to numbers for proper calculation
+  console.log('[GEXHeatmap] Building strike panel from currentData:', {
+    currentDataLength: currentData.length,
+    firstPoint: currentData[0]
+  });
+  
   const strikePanelData = currentData.reduce((acc, point) => {
     const strikeNum = Number(point.strike);
     const existing = acc.find(d => d.strike === strikeNum);
@@ -284,6 +289,11 @@ export default function GEXHeatmap() {
     }
     return acc;
   }, [] as any[]).sort((a, b) => b.strike - a.strike); // Sort descending
+  
+  console.log('[GEXHeatmap] Strike panel data built:', {
+    length: strikePanelData.length,
+    first3: strikePanelData.slice(0, 3)
+  });
 
   // ============================================================================
   // RENDER
