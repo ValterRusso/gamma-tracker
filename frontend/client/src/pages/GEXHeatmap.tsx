@@ -209,6 +209,18 @@ export default function GEXHeatmap() {
   // Get current snapshot data
   const currentData = heatmapData.filter(d => d.timestamp === currentTimestamp);
 
+  // Get spot price from current data
+  const spotPrice = currentData.length > 0 ? Number(currentData[0].spotPrice) : 90000;
+
+  // Filter strikes near spot price (±30% range for better visualization)
+  const minStrike = spotPrice * 0.7;
+  const maxStrike = spotPrice * 1.3;
+  
+  const filteredHeatmapData = heatmapData.filter(d => {
+    const strike = Number(d.strike);
+    return strike >= minStrike && strike <= maxStrike;
+  });
+
   // Get strike panel data (aggregate across time)
   const strikePanelData = currentData.reduce((acc, point) => {
     const existing = acc.find(d => d.strike === point.strike);
@@ -227,9 +239,6 @@ export default function GEXHeatmap() {
     }
     return acc;
   }, [] as any[]).sort((a, b) => b.strike - a.strike); // Sort descending
-
-  // Get spot price from current data
-  const spotPrice = currentData.length > 0 ? currentData[0].spotPrice : null;
 
   // ============================================================================
   // RENDER
@@ -438,12 +447,12 @@ export default function GEXHeatmap() {
                   />
                   
                   <Scatter
-                    data={heatmapData}
+                    data={filteredHeatmapData}
                     fill="#8b5cf6"
                     shape={(props: any) => {
                       const { cx, cy, payload } = props;
                       const gexValue = Math.abs(Number(payload.totalGex));
-                      const maxGex = Math.max(...heatmapData.map(d => Math.abs(Number(d.totalGex))));
+                      const maxGex = Math.max(...filteredHeatmapData.map(d => Math.abs(Number(d.totalGex))));
                       const intensity = gexValue / maxGex;
                       
                       // Color gradient: purple (high) → pink (medium) → red (low)
