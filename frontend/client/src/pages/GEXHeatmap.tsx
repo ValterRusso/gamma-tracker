@@ -271,7 +271,16 @@ export default function GEXHeatmap() {
     firstPoint: currentData[0]
   });
   
-  const strikePanelData = currentData.reduce((acc, point) => {
+  const strikePanelData = currentData.reduce((acc, point, index) => {
+    if (index < 3) {
+      console.log(`[GEXHeatmap] Reduce iteration ${index}:`, {
+        strike: point.strike,
+        totalGex: point.totalGex,
+        strikeNum: Number(point.strike),
+        totalGexNum: Number(point.totalGex)
+      });
+    }
+    
     const strikeNum = Number(point.strike);
     const existing = acc.find(d => d.strike === strikeNum);
     if (existing) {
@@ -279,13 +288,17 @@ export default function GEXHeatmap() {
       existing.callGex += Number(point.callGex);
       existing.putGex += Number(point.putGex);
     } else {
-      acc.push({
+      const newItem = {
         strike: strikeNum,
         totalGex: Number(point.totalGex),
         callGex: Number(point.callGex),
         putGex: Number(point.putGex),
         totalOi: Number(point.totalOi)
-      });
+      };
+      if (index < 3) {
+        console.log(`[GEXHeatmap] Pushing new item:`, newItem);
+      }
+      acc.push(newItem);
     }
     return acc;
   }, [] as any[]).sort((a, b) => b.strike - a.strike); // Sort descending
