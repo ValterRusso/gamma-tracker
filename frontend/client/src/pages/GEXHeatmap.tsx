@@ -224,6 +224,11 @@ export default function GEXHeatmap() {
   // DATA PROCESSING
   // ============================================================================
 
+  // Dynamic field names based on selected model
+  const totalField = settings.model === 'delta' ? 'totalDex' : 'totalGex';
+  const callField = settings.model === 'delta' ? 'callDex' : 'callGex';
+  const putField = settings.model === 'delta' ? 'putDex' : 'putGex';
+
   // Get current snapshot data
   const currentData = heatmapData.filter(d => d.timestamp === currentTimestamp);
   console.log('[GEXHeatmap] Current data:', {
