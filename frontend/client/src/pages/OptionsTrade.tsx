@@ -99,17 +99,27 @@ const OptionsTrade: React.FC = () => {
       const data = await response.json();
       
       if (data.success && data.data.spotPrice) {
-        setCurrentSpot(data.data.spotPrice);
+        const spot = parseFloat(data.data.spotPrice);
+        console.log('[OptionsTrade] Current spot price loaded:', spot);
+        setCurrentSpot(spot);
+      } else {
+        console.warn('[OptionsTrade] Spot price not found in API response');
       }
     } catch (err) {
-      console.error('Error fetching spot price:', err);
+      console.error('[OptionsTrade] Error fetching spot price:', err);
       // Fallback: estimate from ATM options
-      const atmOptions = availableOptions.filter(opt => 
-        opt.side === 'CALL' && opt.delta && Math.abs(opt.delta - 0.5) < 0.1
-      );
-      if (atmOptions.length > 0) {
-        setCurrentSpot(atmOptions[0].strike);
-      }
+      setTimeout(() => {
+        const atmOptions = availableOptions.filter(opt => 
+          opt.side === 'CALL' && opt.delta && Math.abs(opt.delta - 0.5) < 0.1
+        );
+        if (atmOptions.length > 0) {
+          const estimatedSpot = atmOptions[0].strike;
+          console.log('[OptionsTrade] Using ATM strike as spot estimate:', estimatedSpot);
+          setCurrentSpot(estimatedSpot);
+        } else {
+          console.warn('[OptionsTrade] Could not estimate spot price from options');
+        }
+      }, 1000); // Wait for options to load
     }
   };
 
@@ -669,7 +679,14 @@ const OptionsTrade: React.FC = () => {
       {/* Position Summary */}
       {analysis && (
         <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-semibold mb-4 text-white">Position Summary</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">Position Summary</h2>
+            {currentSpot && (
+              <div className="text-sm text-purple-400">
+                Current Spot: {formatPrice(currentSpot)}
+              </div>
+            )}
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
@@ -738,21 +755,24 @@ const OptionsTrade: React.FC = () => {
                 <ReferenceLine y={0} stroke="#64748b" strokeDasharray="3 3" />
                 
                 {/* Current Spot Marker */}
-                {currentSpot && (
-                  <ReferenceLine 
-                    x={currentSpot} 
-                    stroke="#8b5cf6" 
-                    strokeWidth={2}
-                    strokeDasharray="3 3"
-                    label={{
-                      value: `Current: ${formatPrice(currentSpot)}`,
-                      position: 'top',
-                      fill: '#8b5cf6',
-                      fontSize: 12,
-                      fontWeight: 'bold'
-                    }}
-                  />
-                )}
+                {currentSpot && (() => {
+                  console.log('[Chart] Rendering current spot marker at:', currentSpot);
+                  return (
+                    <ReferenceLine 
+                      x={currentSpot} 
+                      stroke="#8b5cf6" 
+                      strokeWidth={2}
+                      strokeDasharray="3 3"
+                      label={{
+                        value: `Current: ${formatPrice(currentSpot)}`,
+                        position: 'top',
+                        fill: '#8b5cf6',
+                        fontSize: 12,
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  );
+                })()}
                 
                 {/* Breakeven markers */}
                 {analysis.breakevens.map((be, idx) => (
