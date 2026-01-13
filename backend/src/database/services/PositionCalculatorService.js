@@ -287,25 +287,45 @@ class PositionCalculatorService {
    * Calculate max profit and max loss for a position
    */
   async calculateMaxProfitLoss(legs, spotRange) {
+    // Check if max profit is unlimited FIRST (before calculating from curve)
+    const hasLongCall = legs.some(leg => leg.side === 'CALL' && leg.action === 'buy');
+    const hasLongPut = legs.some(leg => leg.side === 'PUT' && leg.action === 'buy');
+    const hasShortCall = legs.some(leg => leg.side === 'CALL' && leg.action === 'sell');
+    const hasShortPut = legs.some(leg => leg.side === 'PUT' && leg.action === 'sell');
+    
+    // Unlimited profit scenarios:
+    // - Single long call (no short calls)
+    // - Single long put (no short puts)
+    const isUnlimitedProfit = legs.length === 1 && (hasLongCall || hasLongPut);
+    
+    // Calculate P&L curve
     const pnlCurve = await this.calculatePositionPnL(legs, spotRange);
     
-    let maxProfit = -Infinity;
+    // Calculate max loss (always from curve)
     let maxLoss = Infinity;
-    
     for (const point of pnlCurve) {
-      maxProfit = Math.max(maxProfit, point.pnl);
       maxLoss = Math.min(maxLoss, point.pnl);
     }
     
-    // Check if max profit is unlimited (e.g., long call)
-    const hasLongCall = legs.some(leg => leg.side === 'CALL' && leg.action === 'buy');
-    const hasLongPut = legs.some(leg => leg.side === 'PUT' && leg.action === 'buy');
+    // If unlimited profit, return Infinity
+    if (isUnlimitedProfit) {
+      console.log('[PositionCalculator] Unlimited profit detected (single long option)');
+      return {
+        maxProfit: Infinity,
+        maxLoss: maxLoss
+      };
+    }
     
-    // Simplified check: if we have uncovered long options, profit is unlimited
-    const isUnlimitedProfit = (hasLongCall || hasLongPut) && legs.length === 1;
+    // Otherwise, calculate max profit from curve
+    let maxProfit = -Infinity;
+    for (const point of pnlCurve) {
+      maxProfit = Math.max(maxProfit, point.pnl);
+    }
+    
+    console.log(`[PositionCalculator] Max Profit: ${maxProfit}, Max Loss: ${maxLoss}`);
     
     return {
-      maxProfit: isUnlimitedProfit ? Infinity : maxProfit,
+      maxProfit: maxProfit,
       maxLoss: maxLoss
     };
   }
