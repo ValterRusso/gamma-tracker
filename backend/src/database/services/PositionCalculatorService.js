@@ -50,37 +50,44 @@ class PositionCalculatorService {
 
   /**
    * Get current spot price for an underlying
-   * Estimates from ATM options or uses reasonable default
+   * Fetches real spot price from /api/binance/stats
    */
   async getCurrentSpotPrice(underlying) {
     try {
-      const options = await this.fetchOptionsData();
+      // Fetch real spot price from stats endpoint
+      const response = await axios.get('http://localhost:3300/api/binance/stats');
       
-      // Filter options for this underlying
-      const underlyingOptions = options.filter(opt => opt.underlying === underlying);
-      
-      if (underlyingOptions.length === 0) {
-        // Fallback defaults
-        return underlying === 'BTC' ? 102000 : 3500;
+      if (response.data && response.data.success && response.data.data.spotPrice) {
+        const spotPrice = response.data.data.spotPrice;
+        console.log(`[PositionCalculator] Real spot price for ${underlying}: $${spotPrice}`);
+        return spotPrice;
       }
       
-      // Find ATM options (closest to spot)
-      // ATM options have delta closest to 0.5 for calls
+      // Fallback: estimate from ATM options
+      console.warn('[PositionCalculator] Stats endpoint failed, using ATM estimation');
+      const options = await this.fetchOptionsData();
+      
+      const underlyingOptions = options.filter(opt => opt.underlying === underlying);
+      
+      // Find ATM call (delta closest to 0.5)
       const atmCall = underlyingOptions
         .filter(opt => opt.side === 'CALL' && opt.delta)
         .sort((a, b) => Math.abs(a.delta - 0.5) - Math.abs(b.delta - 0.5))[0];
       
       if (atmCall) {
-        // Spot is approximately the strike of ATM call
+        console.log(`[PositionCalculator] Using ATM strike as spot: $${atmCall.strike}`);
         return atmCall.strike;
       }
       
-      // Fallback: use average of all strikes
+      // Last resort: average of all strikes
       const avgStrike = underlyingOptions.reduce((sum, opt) => sum + opt.strike, 0) / underlyingOptions.length;
+      console.log(`[PositionCalculator] Using average strike as spot: $${avgStrike}`);
       return avgStrike;
     } catch (error) {
-      console.error('Error getting spot price:', error);
-      return underlying === 'BTC' ? 102000 : 3500;
+      console.error('[PositionCalculator] Error getting spot price:', error.message);
+      const fallback = underlying === 'BTC' ? 102000 : 3500;
+      console.log(`[PositionCalculator] Using hardcoded fallback: $${fallback}`);
+      return fallback;
     }
   }
 
@@ -102,7 +109,7 @@ class PositionCalculatorService {
 
   /**
    * Estimate option price at different spot prices
-   * Simplified model: intrinsic + (current extrinsic * decay factor)
+   * Improved model: intrinsic + (extrinsic adjusted for moneyness and time)
    */
   async estimateOptionPrice(option, newSpotPrice, daysToExpiry, currentSpot) {
     const { strike, side, markPrice, entryPrice, underlying } = option;
@@ -131,8 +138,25 @@ class PositionCalculatorService {
     const originalDTE = (option.expiryDate - Date.now()) / (1000 * 60 * 60 * 24);
     const timeDecayFactor = daysToExpiry / originalDTE;
     
-    // Estimate new extrinsic (decays with time)
-    const newExtrinsic = currentExtrinsic * timeDecayFactor;
+    // Moneyness adjustment factor
+    // Extrinsic value decreases as option moves further OTM
+    // and increases as it moves closer to ATM
+    const currentMoneyness = side === 'CALL'
+      ? currentSpot / strike  // For calls: spot/strike
+      : strike / currentSpot; // For puts: strike/spot
+    
+    const newMoneyness = side === 'CALL'
+      ? newSpotPrice / strike
+      : strike / newSpotPrice;
+    
+    // Moneyness factor: how much extrinsic changes based on spot movement
+    // Uses exponential decay as option moves OTM
+    // Factor ranges from ~0 (deep OTM) to ~1 (ATM) to ~0.5 (deep ITM)
+    const moneynessRatio = newMoneyness / currentMoneyness;
+    const moneynessFactor = Math.exp(-Math.abs(1 - newMoneyness) * 2);
+    
+    // Estimate new extrinsic (decays with time and adjusts for moneyness)
+    const newExtrinsic = currentExtrinsic * timeDecayFactor * moneynessFactor;
     
     return newIntrinsic + newExtrinsic;
   }
