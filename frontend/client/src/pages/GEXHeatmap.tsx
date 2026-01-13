@@ -619,14 +619,14 @@ export default function GEXHeatmap() {
                       
                       // Validate data
                       const gexValue = Math.abs(Number(payload.totalGex) || 0);
-                      if (gexValue === 0 || isNaN(gexValue)) return null;
+                      if (gexValue === 0 || isNaN(gexValue)) return <g />;
                       
                       const validData = processedHeatmapData.filter(d => {
                         const val = Math.abs(Number(d.totalGex) || 0);
                         return val > 0 && !isNaN(val);
                       });
                       
-                      if (validData.length === 0) return null;
+                      if (validData.length === 0) return <g />;
                       
                       const maxGex = Math.max(...validData.map(d => Math.abs(Number(d.totalGex))));
                       const intensity = Math.min(gexValue / maxGex, 1);
@@ -647,7 +647,7 @@ export default function GEXHeatmap() {
                       const opacity = Math.min(Math.max(0.6 + (intensity * 0.4), 0.6), 1); // Clamp opacity
                       
                       // Final validation
-                      if (isNaN(size) || isNaN(opacity) || !cx || !cy) return null;
+                      if (isNaN(size) || isNaN(opacity) || !cx || !cy) return <g />;
                       
                       return (
                         <circle
