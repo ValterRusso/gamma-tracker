@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Save, FolderOpen, TrendingUp } from 'lucide-react';
 import { useLocation } from 'wouter';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from 'recharts';
 
 // Types
 interface OptionData {
@@ -521,6 +531,97 @@ const OptionsTrade: React.FC = () => {
                   ? analysis.breakevens.map(be => formatPrice(be)).join(', ')
                   : 'None'}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* P&L Chart */}
+      {analysis && analysis.pnlCurve && analysis.pnlCurve.length > 0 && (
+        <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
+          <h2 className="text-xl font-semibold mb-4 text-white">P&L Visualization</h2>
+          
+          <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={analysis.pnlCurve}>
+                <defs>
+                  <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="lossGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ef4444" stopOpacity={0} />
+                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis 
+                  dataKey="price" 
+                  stroke="#94a3b8"
+                  tickFormatter={(val) => formatPrice(val)}
+                />
+                <YAxis 
+                  stroke="#94a3b8"
+                  tickFormatter={(val) => formatPrice(val)}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #475569',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: number) => [formatPrice(value), 'P&L']}
+                  labelFormatter={(label) => `Spot: ${formatPrice(label)}`}
+                />
+                <ReferenceLine y={0} stroke="#64748b" strokeDasharray="3 3" />
+                
+                {/* Breakeven markers */}
+                {analysis.breakevens.map((be, idx) => (
+                  <ReferenceLine 
+                    key={`be-${idx}`}
+                    x={be} 
+                    stroke="#f59e0b" 
+                    strokeDasharray="5 5"
+                    label={{
+                      value: 'BE',
+                      position: 'top',
+                      fill: '#f59e0b',
+                      fontSize: 12
+                    }}
+                  />
+                ))}
+                
+                {/* P&L Area - Split into profit and loss */}
+                <Area
+                  type="monotone"
+                  dataKey={(data: { pnl: number }) => data.pnl > 0 ? data.pnl : 0}
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  fill="url(#profitGradient)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey={(data: { pnl: number }) => data.pnl < 0 ? data.pnl : 0}
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  fill="url(#lossGradient)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          
+          <div className="mt-4 flex items-center gap-6 text-sm text-gray-400">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-green-500 rounded"></div>
+              <span>Profit Zone</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-red-500 rounded"></div>
+              <span>Loss Zone</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-orange-500 rounded"></div>
+              <span>Breakeven</span>
             </div>
           </div>
         </div>
