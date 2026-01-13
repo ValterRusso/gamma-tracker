@@ -233,16 +233,37 @@ export default function GEXHeatmap() {
   const spotPrice = currentData.length > 0 ? Number(currentData[0].spotPrice) : 90000;
   console.log('[GEXHeatmap] Spot price:', spotPrice);
 
-  // Calculate dynamic strike range from actual data
-  const allStrikes = currentData.map(d => Number(d.strike));
-  const minStrike = allStrikes.length > 0 ? Math.min(...allStrikes) : spotPrice * 0.7;
-  const maxStrike = allStrikes.length > 0 ? Math.max(...allStrikes) : spotPrice * 1.3;
+  // Smart strike range calculation:
+  // 1. Get all unique strikes from current data
+  const allStrikes = [...new Set(currentData.map(d => Number(d.strike)))].sort((a, b) => a - b);
   
-  console.log('[GEXHeatmap] Dynamic strike range:', {
-    minStrike,
-    maxStrike,
-    strikeCount: allStrikes.length,
-    spotPrice
+  // 2. Define range around spot price (±20% for good visibility)
+  const rangePercent = 0.20;
+  const initialMinStrike = spotPrice * (1 - rangePercent);
+  const initialMaxStrike = spotPrice * (1 + rangePercent);
+  
+  // 3. Filter strikes within range
+  const strikesInRange = allStrikes.filter(s => s >= initialMinStrike && s <= initialMaxStrike);
+  
+  // 4. Limit to 25 strikes closest to spot price (for readability)
+  const maxVisibleStrikes = 25;
+  const limitedStrikes = strikesInRange
+    .sort((a, b) => Math.abs(a - spotPrice) - Math.abs(b - spotPrice))
+    .slice(0, maxVisibleStrikes)
+    .sort((a, b) => a - b); // Sort back to ascending order
+  
+  // 5. Calculate final min/max from limited strikes
+  const minStrike = limitedStrikes.length > 0 ? Math.min(...limitedStrikes) : spotPrice * 0.8;
+  const maxStrike = limitedStrikes.length > 0 ? Math.max(...limitedStrikes) : spotPrice * 1.2;
+  
+  console.log('[GEXHeatmap] Smart strike range:', {
+    spotPrice,
+    rangePercent: `±${rangePercent * 100}%`,
+    initialRange: [initialMinStrike, initialMaxStrike],
+    strikesInRange: strikesInRange.length,
+    limitedStrikes: limitedStrikes.length,
+    finalRange: [minStrike, maxStrike],
+    allStrikesCount: allStrikes.length
   });
   
   // Filter currentData by strike range for GEX by Strike panel
@@ -419,33 +440,72 @@ export default function GEXHeatmap() {
         {/* Main Content Grid */}
         <div className="grid grid-cols-[300px_1fr] gap-6">
           
-          {/* Strike Panel (Left) */}
+          {/* Strike Panel (Left) - Aligned BarChart */}
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-white mb-4">GEX by Strike</h3>
             
             {strikePanelData.length > 0 ? (
-              <div className="space-y-2">
-                {strikePanelData.slice(0, 20).map((strike) => (
-                  <div key={strike.strike} className="flex items-center gap-2">
-                    <span className="text-sm text-slate-400 w-20">${Number(strike.strike).toFixed(0)}</span>
-                    <div className="flex-1 h-6 bg-white/5 rounded overflow-hidden">
-                      <div
-                        className="h-full bg-linear-to-r from-purple-500 to-pink-500"
-                        style={{
-                          width: `${Math.min(100, Math.abs(Number(strike.totalGex)) / 100)}%`
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs text-slate-500 w-20 text-right">
-                      {Math.abs(Number(strike.totalGex)) >= 1000 
-                        ? `${(Number(strike.totalGex) / 1000).toFixed(1)}K`
-                        : Number(strike.totalGex).toFixed(1)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <ResponsiveContainer width="100%" height={500}>
+                <BarChart
+                  data={strikePanelData}
+                  layout="horizontal"
+                  margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
+                  
+                  <XAxis
+                    type="number"
+                    tickFormatter={(val) => `${(val / 1000).toFixed(0)}K`}
+                    stroke="#94a3b8"
+                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    label={{ value: 'GEX', position: 'insideBottom', offset: -10, fill: '#94a3b8' }}
+                  />
+                  
+                  <YAxis
+                    type="number"
+                    dataKey="strike"
+                    domain={[minStrike, maxStrike]}
+                    tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
+                    stroke="#94a3b8"
+                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    label={{ value: 'Strike', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+                  />
+                  
+                  <Tooltip
+                    cursor={{ fill: '#ffffff10' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-slate-900/95 backdrop-blur-sm border border-white/20 rounded-lg p-3 shadow-xl">
+                            <p className="text-white font-semibold mb-2">
+                              ${Number(data.strike).toFixed(0)}
+                            </p>
+                            <div className="space-y-1">
+                              <p className="text-xs text-purple-400">
+                                Total GEX: {(Number(data.totalGex) / 1000).toFixed(1)}K
+                              </p>
+                              <p className="text-xs text-green-400">
+                                Call GEX: {(Number(data.callGex) / 1000).toFixed(1)}K
+                              </p>
+                              <p className="text-xs text-red-400">
+                                Put GEX: {(Number(data.putGex) / 1000).toFixed(1)}K
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  
+                  <Bar dataKey="totalGex" fill="#a855f7" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             ) : (
-              <p className="text-slate-500 text-sm">No data available</p>
+              <div className="h-[500px] flex items-center justify-center border border-white/5 rounded-lg">
+                <p className="text-slate-500">No data available</p>
+              </div>
             )}
 
             {spotPrice && (
