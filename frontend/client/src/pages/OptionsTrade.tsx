@@ -208,11 +208,15 @@ const OptionsTrade: React.FC = () => {
   // HELPER FUNCTIONS
   // ============================================================================
 
-  const formatPrice = (price: number): string => {
+  const formatPrice = (price: number | null | undefined): string => {
+    if (price === null || price === undefined || isNaN(price)) {
+      return '$0';
+    }
     return `$${price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
 
-  const formatDate = (timestamp: number): string => {
+  const formatDate = (timestamp: number | null | undefined): string => {
+    if (!timestamp) return 'N/A';
     return new Date(timestamp).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -220,11 +224,15 @@ const OptionsTrade: React.FC = () => {
     });
   };
 
-  const formatGreek = (value: number, decimals: number = 2): string => {
+  const formatGreek = (value: number | null | undefined, decimals: number = 2): string => {
+    if (value === null || value === undefined || isNaN(value)) {
+      return '0';
+    }
     return value.toFixed(decimals);
   };
 
-  const getGreekColor = (value: number): string => {
+  const getGreekColor = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || isNaN(value)) return 'text-gray-400';
     if (value > 0) return 'text-green-400';
     if (value < 0) return 'text-red-400';
     return 'text-gray-400';
