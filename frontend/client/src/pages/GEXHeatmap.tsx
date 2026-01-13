@@ -381,7 +381,7 @@ export default function GEXHeatmap() {
             <select
               value={settings.timeframe}
               onChange={(e) => setSettings({ ...settings, timeframe: e.target.value as any })}
-              className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white"
+              className="px-4 py-2 bg-slate-800 border border-white/10 rounded-lg text-white"
             >
               <option value="1h">1 Hour</option>
               <option value="4h">4 Hours</option>
@@ -393,7 +393,7 @@ export default function GEXHeatmap() {
             <select
               value={settings.model}
               onChange={(e) => setSettings({ ...settings, model: e.target.value as any })}
-              className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white"
+              className="px-4 py-2 bg-slate-800 border border-white/10 rounded-lg text-white"
             >
               <option value="gamma">Gamma</option>
               <option value="delta">Delta Pressure</option>
