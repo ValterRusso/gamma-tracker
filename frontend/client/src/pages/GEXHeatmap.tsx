@@ -245,6 +245,12 @@ export default function GEXHeatmap() {
     spotPrice
   });
   
+  // Filter currentData by strike range for GEX by Strike panel
+  const filteredCurrentData = currentData.filter(d => {
+    const strike = Number(d.strike);
+    return strike >= minStrike && strike <= maxStrike;
+  });
+  
   const filteredHeatmapData = heatmapData.filter(d => {
     const strike = Number(d.strike);
     return strike >= minStrike && strike <= maxStrike;
@@ -274,12 +280,13 @@ export default function GEXHeatmap() {
 
   // Get strike panel data (aggregate across time)
   // IMPORTANT: Convert strings to numbers for proper calculation
-  console.log('[GEXHeatmap] Building strike panel from currentData:', {
+  console.log('[GEXHeatmap] Building strike panel from filteredCurrentData:', {
     currentDataLength: currentData.length,
-    firstPoint: currentData[0]
+    filteredCurrentDataLength: filteredCurrentData.length,
+    firstPoint: filteredCurrentData[0]
   });
   
-  const strikePanelData = currentData.reduce((acc, point, index) => {
+  const strikePanelData = filteredCurrentData.reduce((acc, point, index) => {
     if (index < 3) {
       console.log(`[GEXHeatmap] Reduce iteration ${index}:`, {
         strike: point.strike,
