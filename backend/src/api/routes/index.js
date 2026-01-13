@@ -32,6 +32,7 @@ const ivComparisonRoutes = require('./iv-comparison.routes');
 const optionsRoutes = require('./options.routes');
 const gexHeatmapRoutes = require('./gex-heatmap.routes');
 const dexHeatmapRoutes = require('./dex-heatmap.routes');
+const dvolRoutes = require('./dvol.routes');
 
 module.exports = (dependencies) => {
   // Mount all routes
@@ -50,6 +51,7 @@ module.exports = (dependencies) => {
   router.use(optionsRoutes(dependencies));          // 4 endpoints
   router.use(gexHeatmapRoutes(dependencies));       // 5 endpoints
   router.use(dexHeatmapRoutes(dependencies));       // 4 endpoints
+  router.use(dvolRoutes(dependencies));             // 4 endpoints
   
   return router;
 };

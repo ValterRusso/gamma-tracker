@@ -21,6 +21,7 @@ import EntropyDivergences from "./pages/EntropyDivergences";
 import EntropyDepthAnalysis from "./pages/EntropyDepthAnalysis";
 import EntropyHistory from "./pages/EntropyHistory";
 import GEXHeatmap from "./pages/GEXHeatmap";
+import VolatilityIndex from "./pages/VolatilityIndex";
 
 function Router() {
   return (
@@ -29,6 +30,7 @@ function Router() {
         {/* Gamma Analysis */}
         <Route path={"/"} component={Home} />        
         <Route path="/gex-heatmap" component={GEXHeatmap} />
+        <Route path="/volatility-index" component={VolatilityIndex} />
         
         
         
