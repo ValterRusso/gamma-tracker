@@ -154,14 +154,14 @@ export default function VolatilityIndex() {
   // ============================================================================
 
   const getVolatilityLevel = (vol: number): { label: string; color: string } => {
-    if (vol < 0.5) return { label: 'Calm', color: '#10b981' }; // Green
-    if (vol < 0.8) return { label: 'Normal', color: '#3b82f6' }; // Blue
-    if (vol < 1.2) return { label: 'Elevated', color: '#f59e0b' }; // Orange
+    if (vol < 50) return { label: 'Calm', color: '#10b981' }; // Green
+    if (vol < 80) return { label: 'Normal', color: '#3b82f6' }; // Blue
+    if (vol < 120) return { label: 'Elevated', color: '#f59e0b' }; // Orange
     return { label: 'Extreme', color: '#ef4444' }; // Red
   };
 
   const formatVolatility = (vol: number): string => {
-    return `${(vol * 100).toFixed(1)}%`;
+    return `${vol.toFixed(1)}`;
   };
 
   const formatTimestamp = (ts: number): string => {
@@ -348,7 +348,7 @@ export default function VolatilityIndex() {
                 stroke="#9ca3af"
               />
               <YAxis 
-                tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
+                tickFormatter={(val) => `${val.toFixed(0)}`}
                 stroke="#9ca3af"
               />
               <Tooltip
@@ -358,7 +358,7 @@ export default function VolatilityIndex() {
                   borderRadius: '8px'
                 }}
                 labelFormatter={(val) => new Date(val).toLocaleString()}
-                formatter={(val: number) => [`${(val * 100).toFixed(2)}%`, '']}
+                formatter={(val: number) => [`${val.toFixed(2)}`, '']}
               />
               <Legend />
               <Line
