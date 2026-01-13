@@ -99,11 +99,14 @@ export default function GEXHeatmap() {
       setLoading(true);
       setError(null);
 
-      console.log('[GEXHeatmap] Fetching data for timeframe:', settings.timeframe);
+      console.log('[GEXHeatmap] Fetching data for timeframe:', settings.timeframe, 'model:', settings.model);
 
+      // Determine endpoint based on model
+      const endpoint = settings.model === 'delta' ? 'dex' : 'gex';
+      
       // Fetch heatmap data
       const heatmapRes = await fetch(
-        `http://localhost:3300/api/gex/heatmap?timeframe=${settings.timeframe}`
+        `http://localhost:3300/api/${endpoint}/heatmap?timeframe=${settings.timeframe}`
       );
       const heatmapResponse = await heatmapRes.json();
       console.log('[GEXHeatmap] Heatmap response:', heatmapResponse);
@@ -120,7 +123,7 @@ export default function GEXHeatmap() {
 
       // Fetch timestamps
       const timestampsRes = await fetch(
-        `http://localhost:3300/api/gex/timestamps?timeframe=${settings.timeframe}`
+        `http://localhost:3300/api/${endpoint}/timestamps?timeframe=${settings.timeframe}`
       );
       const timestampsResponse = await timestampsRes.json();
 
@@ -156,7 +159,7 @@ export default function GEXHeatmap() {
       setLoading(false);
       toast.error('Failed to load heatmap data');
     }
-  }, [settings.timeframe]);
+  }, [settings.timeframe, settings.model]);
 
   // Initial fetch
   useEffect(() => {
@@ -425,7 +428,7 @@ export default function GEXHeatmap() {
             >
               <option value="gamma">Gamma</option>
               <option value="delta">Delta Pressure</option>
-              <option value="charm">Charm Pressure</option>
+              <option value="charm" disabled>Charm Pressure (Coming Soon)</option>
             </select>
 
             <button
@@ -442,7 +445,9 @@ export default function GEXHeatmap() {
           
           {/* Strike Panel (Left) - Aligned BarChart */}
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">GEX by Strike</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">
+              {settings.model === 'delta' ? 'DEX' : 'GEX'} by Strike
+            </h3>
             
             {strikePanelData.length > 0 ? (
               <ResponsiveContainer width="100%" height={500}>
@@ -458,7 +463,12 @@ export default function GEXHeatmap() {
                     tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`}
                     stroke="#94a3b8"
                     tick={{ fill: '#94a3b8', fontSize: 12 }}
-                    label={{ value: 'GEX', position: 'insideBottom', offset: -10, fill: '#94a3b8' }}
+                    label={{ 
+                      value: settings.model === 'delta' ? 'DEX' : 'GEX', 
+                      position: 'insideBottom', 
+                      offset: -10, 
+                      fill: '#94a3b8' 
+                    }}
                   />
                   
                   <YAxis
@@ -482,13 +492,13 @@ export default function GEXHeatmap() {
                             </p>
                             <div className="space-y-1">
                               <p className="text-xs text-purple-400">
-                                Total GEX: {(Number(data.totalGex) / 1000000).toFixed(2)}M
+                                Total {settings.model === 'delta' ? 'DEX' : 'GEX'}: {(Number(data.totalGex) / 1000000).toFixed(2)}M
                               </p>
                               <p className="text-xs text-green-400">
-                                Call GEX: {(Number(data.callGex) / 1000000).toFixed(2)}M
+                                Call {settings.model === 'delta' ? 'DEX' : 'GEX'}: {(Number(data.callGex) / 1000000).toFixed(2)}M
                               </p>
                               <p className="text-xs text-red-400">
-                                Put GEX: {(Number(data.putGex) / 1000000).toFixed(2)}M
+                                Put {settings.model === 'delta' ? 'DEX' : 'GEX'}: {(Number(data.putGex) / 1000000).toFixed(2)}M
                               </p>
                             </div>
                           </div>
@@ -574,13 +584,13 @@ export default function GEXHeatmap() {
                             </p>
                             <div className="mt-2 space-y-1">
                               <p className="text-xs text-purple-400">
-                                Total GEX: {(Number(data.totalGex) / 1000000).toFixed(2)}M
+                                Total {settings.model === 'delta' ? 'DEX' : 'GEX'}: {(Number(data.totalGex) / 1000000).toFixed(2)}M
                               </p>
                               <p className="text-xs text-green-400">
-                                Call GEX: {(Number(data.callGex) / 1000000).toFixed(2)}M
+                                Call {settings.model === 'delta' ? 'DEX' : 'GEX'}: {(Number(data.callGex) / 1000000).toFixed(2)}M
                               </p>
                               <p className="text-xs text-red-400">
-                                Put GEX: {(Number(data.putGex) / 1000000).toFixed(2)}M
+                                Put {settings.model === 'delta' ? 'DEX' : 'GEX'}: {(Number(data.putGex) / 1000000).toFixed(2)}M
                               </p>
                             </div>
                           </div>

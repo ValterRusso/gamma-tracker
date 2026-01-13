@@ -21,6 +21,7 @@ const Database = require('./database/Database');
 const DataPersistenceService = require('./database/services/DataPersistenceService');
 const DataRetentionService = require('./database/services/DataRetentionService');
 const GEXSnapshotService = require('./database/services/GEXSnapshotService');
+const DEXSnapshotService = require('./database/services/DEXSnapshotService');
 
 // Data Collection
 const DataCollector = require('./collectors/DataCollector');
@@ -77,6 +78,7 @@ class GammaTracker {
     this.persistence = null;
     this.retention = null;
     this.gexSnapshotService = null;
+    this.dexSnapshotService = null;
     this.persistenceTimer = null;
     
     // Calculators
@@ -264,6 +266,7 @@ class GammaTracker {
         
         // Database Services
         gexSnapshotService: this.gexSnapshotService,
+        dexSnapshotService: this.dexSnapshotService,
         
         // Config
         config: {
@@ -305,6 +308,9 @@ class GammaTracker {
       // 4. Initialize GEX snapshot service
       this.gexSnapshotService = new GEXSnapshotService(this.database);
       this.gexSnapshotService.setSnapshotInterval(60000); // 1 minute
+      
+      // 5. Initialize DEX snapshot service
+      this.dexSnapshotService = new DEXSnapshotService(this.database);
       
       this.logger.success('✓ Database inicializado com persistência ativada');
       

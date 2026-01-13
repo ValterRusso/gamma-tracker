@@ -5,8 +5,8 @@
  * 
  * Monta todas as routes da API em um único router
  * 
- * Total: 14 route files
- * Total: 72+ endpoints
+ * Total: 15 route files
+ * Total: 76+ endpoints
  * 
  * @author Valter Russo - Gamma Tracker Team
  * @version 1.0
@@ -31,6 +31,7 @@ const historyRoutes = require('./history.routes');
 const ivComparisonRoutes = require('./iv-comparison.routes');
 const optionsRoutes = require('./options.routes');
 const gexHeatmapRoutes = require('./gex-heatmap.routes');
+const dexHeatmapRoutes = require('./dex-heatmap.routes');
 
 module.exports = (dependencies) => {
   // Mount all routes
@@ -48,6 +49,7 @@ module.exports = (dependencies) => {
   router.use(ivComparisonRoutes(dependencies));     // 13 endpoints
   router.use(optionsRoutes(dependencies));          // 4 endpoints
   router.use(gexHeatmapRoutes(dependencies));       // 5 endpoints
+  router.use(dexHeatmapRoutes(dependencies));       // 4 endpoints
   
   return router;
 };
