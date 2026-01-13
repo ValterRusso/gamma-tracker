@@ -83,10 +83,35 @@ const OptionsTrade: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterMoneyness, setFilterMoneyness] = useState<string>('all');
 
-  // Fetch available options on mount
+  // Current spot price (fetched from API)
+  const [currentSpot, setCurrentSpot] = useState<number | null>(null);
+
+  // Fetch available options and spot price on mount
   useEffect(() => {
     fetchAvailableOptions();
+    fetchCurrentSpot();
   }, []);
+
+  // Fetch current spot price
+  const fetchCurrentSpot = async () => {
+    try {
+      const response = await fetch('http://localhost:3300/api/binance/stats');
+      const data = await response.json();
+      
+      if (data.success && data.data.spotPrice) {
+        setCurrentSpot(data.data.spotPrice);
+      }
+    } catch (err) {
+      console.error('Error fetching spot price:', err);
+      // Fallback: estimate from ATM options
+      const atmOptions = availableOptions.filter(opt => 
+        opt.side === 'CALL' && opt.delta && Math.abs(opt.delta - 0.5) < 0.1
+      );
+      if (atmOptions.length > 0) {
+        setCurrentSpot(atmOptions[0].strike);
+      }
+    }
+  };
 
   // Recalculate position when legs change
   useEffect(() => {
@@ -712,6 +737,23 @@ const OptionsTrade: React.FC = () => {
                 />
                 <ReferenceLine y={0} stroke="#64748b" strokeDasharray="3 3" />
                 
+                {/* Current Spot Marker */}
+                {currentSpot && (
+                  <ReferenceLine 
+                    x={currentSpot} 
+                    stroke="#8b5cf6" 
+                    strokeWidth={2}
+                    strokeDasharray="3 3"
+                    label={{
+                      value: `Current: ${formatPrice(currentSpot)}`,
+                      position: 'top',
+                      fill: '#8b5cf6',
+                      fontSize: 12,
+                      fontWeight: 'bold'
+                    }}
+                  />
+                )}
+                
                 {/* Breakeven markers */}
                 {analysis.breakevens.map((be, idx) => (
                   <ReferenceLine 
@@ -760,6 +802,12 @@ const OptionsTrade: React.FC = () => {
               <div className="w-3 h-3 bg-orange-500 rounded"></div>
               <span>Breakeven</span>
             </div>
+            {currentSpot && (
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-purple-500 rounded"></div>
+                <span>Current Spot</span>
+              </div>
+            )}
           </div>
         </div>
       )}
