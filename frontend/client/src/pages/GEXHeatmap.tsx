@@ -448,27 +448,26 @@ export default function GEXHeatmap() {
               <ResponsiveContainer width="100%" height={500}>
                 <BarChart
                   data={strikePanelData}
-                  layout="horizontal"
-                  margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
+                  layout="vertical"
+                  margin={{ top: 20, right: 20, bottom: 60, left: 80 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
                   
                   <XAxis
                     type="number"
-                    tickFormatter={(val) => `${(val / 1000).toFixed(0)}K`}
+                    tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`}
                     stroke="#94a3b8"
                     tick={{ fill: '#94a3b8', fontSize: 12 }}
                     label={{ value: 'GEX', position: 'insideBottom', offset: -10, fill: '#94a3b8' }}
                   />
                   
                   <YAxis
-                    type="number"
+                    type="category"
                     dataKey="strike"
-                    domain={[minStrike, maxStrike]}
                     tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
                     stroke="#94a3b8"
-                    tick={{ fill: '#94a3b8', fontSize: 12 }}
-                    label={{ value: 'Strike', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+                    tick={{ fill: '#94a3b8', fontSize: 11 }}
+                    width={70}
                   />
                   
                   <Tooltip
@@ -483,13 +482,13 @@ export default function GEXHeatmap() {
                             </p>
                             <div className="space-y-1">
                               <p className="text-xs text-purple-400">
-                                Total GEX: {(Number(data.totalGex) / 1000).toFixed(1)}K
+                                Total GEX: {(Number(data.totalGex) / 1000000).toFixed(2)}M
                               </p>
                               <p className="text-xs text-green-400">
-                                Call GEX: {(Number(data.callGex) / 1000).toFixed(1)}K
+                                Call GEX: {(Number(data.callGex) / 1000000).toFixed(2)}M
                               </p>
                               <p className="text-xs text-red-400">
-                                Put GEX: {(Number(data.putGex) / 1000).toFixed(1)}K
+                                Put GEX: {(Number(data.putGex) / 1000000).toFixed(2)}M
                               </p>
                             </div>
                           </div>
