@@ -605,9 +605,20 @@ export default function GEXHeatmap() {
                     fill="#8b5cf6"
                     shape={(props: any) => {
                       const { cx, cy, payload } = props;
-                      const gexValue = Math.abs(payload.totalGex);
-                      const maxGex = Math.max(...processedHeatmapData.map(d => Math.abs(d.totalGex)));
-                      const intensity = gexValue / maxGex;
+                      
+                      // Validate data
+                      const gexValue = Math.abs(Number(payload.totalGex) || 0);
+                      if (gexValue === 0 || isNaN(gexValue)) return null;
+                      
+                      const validData = processedHeatmapData.filter(d => {
+                        const val = Math.abs(Number(d.totalGex) || 0);
+                        return val > 0 && !isNaN(val);
+                      });
+                      
+                      if (validData.length === 0) return null;
+                      
+                      const maxGex = Math.max(...validData.map(d => Math.abs(Number(d.totalGex))));
+                      const intensity = Math.min(gexValue / maxGex, 1);
                       
                       // Color gradient: purple (high) → pink (medium) → red (low)
                       let color;
@@ -621,7 +632,11 @@ export default function GEXHeatmap() {
                         color = '#ef4444'; // Red
                       }
                       
-                      const size = 4 + (intensity * 8); // Size based on intensity
+                      const size = Math.max(4 + (intensity * 8), 4); // Size based on intensity, min 4
+                      const opacity = Math.min(Math.max(0.6 + (intensity * 0.4), 0.6), 1); // Clamp opacity
+                      
+                      // Final validation
+                      if (isNaN(size) || isNaN(opacity) || !cx || !cy) return null;
                       
                       return (
                         <circle
@@ -629,7 +644,7 @@ export default function GEXHeatmap() {
                           cy={cy}
                           r={size}
                           fill={color}
-                          fillOpacity={0.6 + (intensity * 0.4)}
+                          fillOpacity={opacity}
                           stroke={color}
                           strokeWidth={1}
                           strokeOpacity={0.8}
