@@ -33,12 +33,18 @@ import { toast } from 'sonner';
 interface GEXDataPoint {
   timestamp: number;
   strike: number;
-  totalGex: number;
-  callGex: number;
-  putGex: number;
-  callOi: number;
-  putOi: number;
-  totalOi: number;
+  // Gamma Exposure fields (GEX)
+  totalGex?: number;
+  callGex?: number;
+  putGex?: number;
+  // Delta Exposure fields (DEX)
+  totalDex?: number;
+  callDex?: number;
+  putDex?: number;
+  // Common fields
+  callOi?: number;
+  putOi?: number;
+  totalOi?: number;
   spotPrice: number;
 }
 
