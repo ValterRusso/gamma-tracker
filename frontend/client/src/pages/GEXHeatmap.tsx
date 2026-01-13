@@ -284,12 +284,12 @@ export default function GEXHeatmap() {
   const processedHeatmapData = filteredHeatmapData.map(d => ({
     timestamp: Number(d.timestamp),
     strike: Number(d.strike),
-    totalGex: Number(d.totalGex),
-    callGex: Number(d.callGex),
-    putGex: Number(d.putGex),
-    callOi: Number(d.callOi),
-    putOi: Number(d.putOi),
-    totalOi: Number(d.totalOi),
+    totalGex: Number(d[totalField] || d.totalGex || 0),
+    callGex: Number(d[callField] || d.callGex || 0),
+    putGex: Number(d[putField] || d.putGex || 0),
+    callOi: Number(d.callOi || 0),
+    putOi: Number(d.putOi || 0),
+    totalOi: Number(d.totalOi || 0),
     spotPrice: Number(d.spotPrice)
   }));
   
@@ -323,16 +323,16 @@ export default function GEXHeatmap() {
     const strikeNum = Number(point.strike);
     const existing = acc.find(d => d.strike === strikeNum);
     if (existing) {
-      existing.totalGex += Number(point.totalGex);
-      existing.callGex += Number(point.callGex);
-      existing.putGex += Number(point.putGex);
+      existing.totalGex += Number(point[totalField] || 0);
+      existing.callGex += Number(point[callField] || 0);
+      existing.putGex += Number(point[putField] || 0);
     } else {
       const newItem = {
         strike: strikeNum,
-        totalGex: Number(point.totalGex),
-        callGex: Number(point.callGex),
-        putGex: Number(point.putGex),
-        totalOi: Number(point.totalOi)
+        totalGex: Number(point[totalField] || 0),
+        callGex: Number(point[callField] || 0),
+        putGex: Number(point[putField] || 0),
+        totalOi: Number(point.totalOi || 0)
       };
       if (index < 3) {
         console.log(`[GEXHeatmap] Pushing new item:`, newItem);
