@@ -700,7 +700,7 @@ const OptionsTrade: React.FC = () => {
             <div>
               <div className="text-sm text-gray-400 mb-1">Max Profit</div>
               <div className="text-lg font-semibold text-green-400">
-                {analysis.maxProfit === Infinity || analysis.maxProfit === 'Infinity' ? 'Unlimited' : formatPrice(analysis.maxProfit)}
+                {analysis.maxProfit === Infinity ? 'Unlimited' : formatPrice(analysis.maxProfit)}
               </div>
             </div>
 
