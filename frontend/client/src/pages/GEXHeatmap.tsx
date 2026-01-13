@@ -502,7 +502,7 @@ export default function GEXHeatmap() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[500px] flex items-center justify-center border border-white/5 rounded-lg">
+              <div className="h-125 flex items-center justify-center border border-white/5 rounded-lg">
                 <p className="text-slate-500">No data available</p>
               </div>
             )}
