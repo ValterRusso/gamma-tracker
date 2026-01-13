@@ -32,7 +32,7 @@ module.exports = (dependencies) => {
    *   }
    * }
    */
-  router.post('/calculate', async (req, res) => {
+  router.post('/positions/calculate', async (req, res) => {
     try {
       const { legs, config } = req.body;
 
@@ -64,7 +64,7 @@ module.exports = (dependencies) => {
    * POST /api/positions/greeks
    * Calculate only Greeks for a position (faster)
    */
-  router.post('/greeks', async (req, res) => {
+  router.post('/positions/greeks', async (req, res) => {
     try {
       const { legs } = req.body;
 
@@ -98,7 +98,7 @@ module.exports = (dependencies) => {
    * POST /api/positions/scenarios
    * Calculate P&L for multiple scenarios (different times/IVs)
    */
-  router.post('/scenarios', async (req, res) => {
+  router.post('/positions/scenarios', async (req, res) => {
     try {
       const { legs, scenarios } = req.body;
 
@@ -149,7 +149,7 @@ module.exports = (dependencies) => {
    * GET /api/positions/health
    * Health check endpoint
    */
-  router.get('/health', (req, res) => {
+  router.get('/positions/health', (req, res) => {
     res.json({
       success: true,
       message: 'Positions API is healthy',
