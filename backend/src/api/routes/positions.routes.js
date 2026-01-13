@@ -47,9 +47,17 @@ module.exports = (dependencies) => {
       // Calculate position
       const result = await positionCalculator.calculatePosition(legs, config || {});
 
+      // Convert Infinity to string for JSON serialization
+      // (JavaScript Infinity becomes null in JSON.stringify)
+      const serializedResult = {
+        ...result,
+        maxProfit: result.maxProfit === Infinity ? 'Infinity' : result.maxProfit,
+        maxLoss: result.maxLoss === -Infinity ? '-Infinity' : result.maxLoss
+      };
+
       res.json({
         success: true,
-        data: result
+        data: serializedResult
       });
     } catch (error) {
       console.error('Error calculating position:', error);
