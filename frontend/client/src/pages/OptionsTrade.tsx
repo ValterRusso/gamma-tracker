@@ -78,6 +78,11 @@ const OptionsTrade: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Filter state
+  const [filterExpiry, setFilterExpiry] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterMoneyness, setFilterMoneyness] = useState<string>('all');
+
   // Fetch available options on mount
   useEffect(() => {
     fetchAvailableOptions();
@@ -110,6 +115,71 @@ const OptionsTrade: React.FC = () => {
       console.error('Error fetching options:', err);
       setError('Failed to fetch options data');
     }
+  };
+
+  // ============================================================================
+  // FILTER LOGIC
+  // ============================================================================
+
+  // Get unique expiry dates
+  const getUniqueExpiries = (): string[] => {
+    const expiries = availableOptions.map(opt => opt.expiryDate);
+    const uniqueExpiries = Array.from(new Set(expiries)).sort((a, b) => a - b);
+    return uniqueExpiries.map(exp => exp.toString());
+  };
+
+  // Determine moneyness (ITM/ATM/OTM)
+  const getMoneyness = (option: OptionData, spotPrice: number): string => {
+    const { strike, side } = option;
+    const priceDiff = Math.abs(spotPrice - strike);
+    const percentDiff = priceDiff / spotPrice;
+
+    // ATM if within 2% of spot
+    if (percentDiff < 0.02) return 'ATM';
+
+    if (side === 'CALL') {
+      return spotPrice > strike ? 'ITM' : 'OTM';
+    } else {
+      return spotPrice < strike ? 'ITM' : 'OTM';
+    }
+  };
+
+  // Apply filters to options
+  const filteredOptions = availableOptions.filter(option => {
+    // Expiry filter
+    if (filterExpiry !== 'all' && option.expiryDate.toString() !== filterExpiry) {
+      return false;
+    }
+
+    // Type filter
+    if (filterType !== 'all' && option.side !== filterType) {
+      return false;
+    }
+
+    // Moneyness filter (approximate spot price from options)
+    if (filterMoneyness !== 'all') {
+      // Estimate spot price from ATM options
+      const atmOptions = availableOptions.filter(opt => 
+        opt.side === 'CALL' && opt.delta && Math.abs(opt.delta - 0.5) < 0.1
+      );
+      const spotPrice = atmOptions.length > 0 
+        ? atmOptions[0].strike 
+        : 94000; // fallback
+      
+      const moneyness = getMoneyness(option, spotPrice);
+      if (moneyness !== filterMoneyness) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Reset filters
+  const handleResetFilters = () => {
+    setFilterExpiry('all');
+    setFilterType('all');
+    setFilterMoneyness('all');
   };
 
   const calculatePosition = async () => {
@@ -301,6 +371,73 @@ const OptionsTrade: React.FC = () => {
       <div className="mb-6 bg-slate-800/50 rounded-xl p-6 border border-slate-700">
         <h2 className="text-xl font-semibold mb-4 text-white">Add Leg</h2>
         
+        {/* Filters */}
+        <div className="mb-4 p-4 bg-slate-900/50 rounded-lg border border-slate-600">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-gray-300">Filters</h3>
+            <button
+              onClick={handleResetFilters}
+              className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            >
+              Reset All
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Expiry Filter */}
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">
+                Expiry Date
+              </label>
+              <select
+                value={filterExpiry}
+                onChange={(e) => setFilterExpiry(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-purple-500"
+              >
+                <option value="all">All Expiries</option>
+                {getUniqueExpiries().map((expiry) => (
+                  <option key={expiry} value={expiry}>
+                    {formatDate(parseInt(expiry))}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Type Filter */}
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">
+                Option Type
+              </label>
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-purple-500"
+              >
+                <option value="all">All Types</option>
+                <option value="CALL">Calls Only</option>
+                <option value="PUT">Puts Only</option>
+              </select>
+            </div>
+
+            {/* Moneyness Filter */}
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">
+                Moneyness
+              </label>
+              <select
+                value={filterMoneyness}
+                onChange={(e) => setFilterMoneyness(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-purple-500"
+              >
+                <option value="all">All</option>
+                <option value="ITM">ITM (In The Money)</option>
+                <option value="ATM">ATM (At The Money)</option>
+                <option value="OTM">OTM (Out of The Money)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Option Selector */}
           <div className="md:col-span-2">
@@ -310,13 +447,13 @@ const OptionsTrade: React.FC = () => {
             <select
               value={selectedOption?.symbol || ''}
               onChange={(e) => {
-                const option = availableOptions.find(opt => opt.symbol === e.target.value);
+                const option = filteredOptions.find(opt => opt.symbol === e.target.value);
                 setSelectedOption(option || null);
               }}
               className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
             >
-              <option value="">Select an option...</option>
-              {availableOptions.map((option) => (
+              <option value="">Select an option... ({filteredOptions.length} available)</option>
+              {filteredOptions.map((option) => (
                 <option key={option.symbol} value={option.symbol}>
                   {option.underlying} {formatPrice(option.strike)} {option.side} - {formatDate(option.expiryDate)} - ${option.markPrice.toFixed(0)}
                 </option>
