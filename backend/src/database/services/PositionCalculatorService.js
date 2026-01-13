@@ -49,6 +49,42 @@ class PositionCalculatorService {
   }
 
   /**
+   * Get current spot price for an underlying
+   * Estimates from ATM options or uses reasonable default
+   */
+  async getCurrentSpotPrice(underlying) {
+    try {
+      const options = await this.fetchOptionsData();
+      
+      // Filter options for this underlying
+      const underlyingOptions = options.filter(opt => opt.underlying === underlying);
+      
+      if (underlyingOptions.length === 0) {
+        // Fallback defaults
+        return underlying === 'BTC' ? 102000 : 3500;
+      }
+      
+      // Find ATM options (closest to spot)
+      // ATM options have delta closest to 0.5 for calls
+      const atmCall = underlyingOptions
+        .filter(opt => opt.side === 'CALL' && opt.delta)
+        .sort((a, b) => Math.abs(a.delta - 0.5) - Math.abs(b.delta - 0.5))[0];
+      
+      if (atmCall) {
+        // Spot is approximately the strike of ATM call
+        return atmCall.strike;
+      }
+      
+      // Fallback: use average of all strikes
+      const avgStrike = underlyingOptions.reduce((sum, opt) => sum + opt.strike, 0) / underlyingOptions.length;
+      return avgStrike;
+    } catch (error) {
+      console.error('Error getting spot price:', error);
+      return underlying === 'BTC' ? 102000 : 3500;
+    }
+  }
+
+  /**
    * Calculate intrinsic value of an option
    */
   calculateIntrinsicValue(strike, spotPrice, side, action) {
@@ -68,16 +104,23 @@ class PositionCalculatorService {
    * Estimate option price at different spot prices
    * Simplified model: intrinsic + (current extrinsic * decay factor)
    */
-  estimateOptionPrice(option, newSpotPrice, daysToExpiry) {
-    const { strike, side, markPrice } = option;
-    const currentSpot = parseFloat(option.underlying === 'BTC' ? 100000 : 3500); // Approximate current spot
+  async estimateOptionPrice(option, newSpotPrice, daysToExpiry, currentSpot) {
+    const { strike, side, markPrice, entryPrice, underlying } = option;
+    
+    // Use entryPrice as fallback if markPrice is missing
+    const optionPrice = markPrice || entryPrice || 0;
+    
+    // Use provided currentSpot or fetch it
+    if (!currentSpot) {
+      currentSpot = await this.getCurrentSpotPrice(underlying || 'BTC');
+    }
     
     // Calculate current intrinsic and extrinsic
     const currentIntrinsic = side === 'CALL' 
       ? Math.max(0, currentSpot - strike)
       : Math.max(0, strike - currentSpot);
     
-    const currentExtrinsic = Math.max(0, markPrice - currentIntrinsic);
+    const currentExtrinsic = Math.max(0, optionPrice - currentIntrinsic);
     
     // Calculate new intrinsic
     const newIntrinsic = side === 'CALL'
@@ -97,7 +140,7 @@ class PositionCalculatorService {
   /**
    * Calculate P&L for a single leg at a specific spot price
    */
-  calculateLegPnL(leg, spotPrice, daysToExpiry = null) {
+  async calculateLegPnL(leg, spotPrice, daysToExpiry = null, currentSpot = null) {
     const { entryPrice, quantity, action } = leg;
     
     // If daysToExpiry not specified, use current time
@@ -105,7 +148,7 @@ class PositionCalculatorService {
       (leg.expiryDate - Date.now()) / (1000 * 60 * 60 * 24);
     
     // Estimate option price at new spot
-    const estimatedPrice = this.estimateOptionPrice(leg, spotPrice, dte);
+    const estimatedPrice = await this.estimateOptionPrice(leg, spotPrice, dte, currentSpot);
     
     // Calculate P&L
     let pnl = 0;
@@ -124,11 +167,15 @@ class PositionCalculatorService {
   async calculatePositionPnL(legs, spotPrices, daysToExpiry = null) {
     const pnlCurve = [];
     
+    // Get current spot price once (all legs should have same underlying)
+    const underlying = legs[0]?.underlying || 'BTC';
+    const currentSpot = await this.getCurrentSpotPrice(underlying);
+    
     for (const spotPrice of spotPrices) {
       let totalPnL = 0;
       
       for (const leg of legs) {
-        const legPnL = this.calculateLegPnL(leg, spotPrice, daysToExpiry);
+        const legPnL = await this.calculateLegPnL(leg, spotPrice, daysToExpiry, currentSpot);
         totalPnL += legPnL;
       }
       
