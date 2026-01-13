@@ -233,9 +233,17 @@ export default function GEXHeatmap() {
   const spotPrice = currentData.length > 0 ? Number(currentData[0].spotPrice) : 90000;
   console.log('[GEXHeatmap] Spot price:', spotPrice);
 
-  // Filter strikes near spot price (±30% range for better visualization)
-  const minStrike = spotPrice * 0.7;
-  const maxStrike = spotPrice * 1.3;
+  // Calculate dynamic strike range from actual data
+  const allStrikes = currentData.map(d => Number(d.strike));
+  const minStrike = allStrikes.length > 0 ? Math.min(...allStrikes) : spotPrice * 0.7;
+  const maxStrike = allStrikes.length > 0 ? Math.max(...allStrikes) : spotPrice * 1.3;
+  
+  console.log('[GEXHeatmap] Dynamic strike range:', {
+    minStrike,
+    maxStrike,
+    strikeCount: allStrikes.length,
+    spotPrice
+  });
   
   const filteredHeatmapData = heatmapData.filter(d => {
     const strike = Number(d.strike);
