@@ -94,6 +94,12 @@ const OptionsTrade: React.FC = () => {
 
   // Fetch current spot price
   const fetchCurrentSpot = async () => {
+    // Prevent multiple fetches
+    if (currentSpot !== null) {
+      console.log('[OptionsTrade] Spot already loaded, skipping fetch');
+      return;
+    }
+
     try {
       const response = await fetch('http://localhost:3300/api/binance/stats');
       const data = await response.json();
@@ -109,15 +115,17 @@ const OptionsTrade: React.FC = () => {
       console.error('[OptionsTrade] Error fetching spot price:', err);
       // Fallback: estimate from ATM options
       setTimeout(() => {
-        const atmOptions = availableOptions.filter(opt => 
-          opt.side === 'CALL' && opt.delta && Math.abs(opt.delta - 0.5) < 0.1
-        );
-        if (atmOptions.length > 0) {
-          const estimatedSpot = atmOptions[0].strike;
-          console.log('[OptionsTrade] Using ATM strike as spot estimate:', estimatedSpot);
-          setCurrentSpot(estimatedSpot);
-        } else {
-          console.warn('[OptionsTrade] Could not estimate spot price from options');
+        if (currentSpot === null) { // Only if still not loaded
+          const atmOptions = availableOptions.filter(opt => 
+            opt.side === 'CALL' && opt.delta && Math.abs(opt.delta - 0.5) < 0.1
+          );
+          if (atmOptions.length > 0) {
+            const estimatedSpot = atmOptions[0].strike;
+            console.log('[OptionsTrade] Using ATM strike as spot estimate:', estimatedSpot);
+            setCurrentSpot(estimatedSpot);
+          } else {
+            console.warn('[OptionsTrade] Could not estimate spot price from options');
+          }
         }
       }, 1000); // Wait for options to load
     }
@@ -722,7 +730,10 @@ const OptionsTrade: React.FC = () => {
           
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={analysis.pnlCurve}>
+              <AreaChart 
+                data={analysis.pnlCurve}
+                key={`chart-${currentSpot || 'loading'}`}
+              >
                 <defs>
                   <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
