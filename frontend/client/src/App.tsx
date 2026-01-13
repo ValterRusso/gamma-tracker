@@ -22,6 +22,7 @@ import EntropyDepthAnalysis from "./pages/EntropyDepthAnalysis";
 import EntropyHistory from "./pages/EntropyHistory";
 import GEXHeatmap from "./pages/GEXHeatmap";
 import VolatilityIndex from "./pages/VolatilityIndex";
+import OptionsTrade from "./pages/OptionsTrade";
 
 function Router() {
   return (
@@ -31,6 +32,7 @@ function Router() {
         <Route path={"/"} component={Home} />        
         <Route path="/gex-heatmap" component={GEXHeatmap} />
         <Route path="/volatility-index" component={VolatilityIndex} />
+        <Route path="/options-trade" component={OptionsTrade} />
         
         
         
