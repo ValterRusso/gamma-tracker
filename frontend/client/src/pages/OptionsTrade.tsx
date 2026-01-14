@@ -743,7 +743,9 @@ const OptionsTrade: React.FC = () => {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                 <XAxis 
-                  dataKey="price" 
+                  dataKey="price"
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
                   stroke="#94a3b8"
                   tickFormatter={(val) => formatPrice(val)}
                 />
