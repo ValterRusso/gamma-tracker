@@ -69,12 +69,22 @@ class Database {
     const AnomaliesLog = require('./models/AnomaliesLog')(this.sequelize);
     const GEXSnapshot = require('./models/GEXSnapshot')(this.sequelize);
     
+    // Trading Bot models
+    const BotTrade = require('./models/BotTrade')(this.sequelize);
+    const BotConfig = require('./models/BotConfig')(this.sequelize);
+    const BotSignal = require('./models/BotSignal')(this.sequelize);
+    const BotPerformance = require('./models/BotPerformance')(this.sequelize);
+    
     this.models = {
       Asset,
       MarketSnapshot,
       OptionsHistory,
       AnomaliesLog,
-      GEXSnapshot
+      GEXSnapshot,
+      BotTrade,
+      BotConfig,
+      BotSignal,
+      BotPerformance
     };
     
     // Setup associations
