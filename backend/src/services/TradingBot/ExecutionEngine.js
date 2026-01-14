@@ -68,6 +68,10 @@ class ExecutionEngine {
       return this.buildIronCondor(options, spot, params);
     }
     
+    if (strategy === 'iron_butterfly') {
+      return this.buildIronButterfly(params, options);
+    }
+    
     // Add more strategies here
     throw new Error(`Unknown strategy: ${strategy}`);
   }
@@ -134,6 +138,72 @@ class ExecutionEngine {
       { ...shortCall, action: 'sell', quantity: 1 },
       { ...longCall, action: 'buy', quantity: 1 },
       { ...shortPut, action: 'sell', quantity: 1 },
+      { ...longPut, action: 'buy', quantity: 1 }
+    ];
+  }
+
+  /**
+   * Build Iron Butterfly legs
+   * Sell ATM straddle + buy wings
+   */
+  async buildIronButterfly(signal, options) {
+    const { spotPrice, expiration } = signal;
+    const { shortDelta, longDelta, wingWidth } = this.config;
+    
+    // Filter options for selected expiration
+    const validOptions = options.filter(opt => opt.expiryDate === expiration);
+    
+    if (validOptions.length === 0) {
+      this.logger.warn('[ExecutionEngine] No options found for expiration');
+      return null;
+    }
+    
+    // Find ATM call (delta closest to 0.50)
+    const atmCall = this.findOptionByDelta(
+      validOptions.filter(opt => opt.side === 'CALL'),
+      0.50,
+      'closest'
+    );
+    
+    // Find ATM put (delta closest to -0.50)
+    const atmPut = this.findOptionByDelta(
+      validOptions.filter(opt => opt.side === 'PUT'),
+      -0.50,
+      'closest'
+    );
+    
+    if (!atmCall || !atmPut) {
+      this.logger.warn('[ExecutionEngine] Could not find ATM strikes');
+      return null;
+    }
+    
+    // For Iron Butterfly, ATM strikes should be the same or very close
+    const atmStrike = atmCall.strike;
+    
+    // Find long call (wingWidth higher)
+    const longCall = this.findOptionByStrike(
+      validOptions.filter(opt => opt.side === 'CALL'),
+      atmStrike + wingWidth,
+      'closest'
+    );
+    
+    // Find long put (wingWidth lower)
+    const longPut = this.findOptionByStrike(
+      validOptions.filter(opt => opt.side === 'PUT'),
+      atmStrike - wingWidth,
+      'closest'
+    );
+    
+    if (!longCall || !longPut) {
+      this.logger.warn('[ExecutionEngine] Could not find wing strikes');
+      return null;
+    }
+    
+    // Build legs array (sell ATM straddle + buy wings)
+    return [
+      { ...atmCall, action: 'sell', quantity: 1 },
+      { ...longCall, action: 'buy', quantity: 1 },
+      { ...atmPut, action: 'sell', quantity: 1 },
       { ...longPut, action: 'buy', quantity: 1 }
     ];
   }
