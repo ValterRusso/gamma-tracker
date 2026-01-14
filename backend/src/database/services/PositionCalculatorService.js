@@ -331,15 +331,76 @@ class PositionCalculatorService {
   }
 
   /**
+   * Calculate P&L curves at different time points
+   * Returns array of curves: today, 7d, 14d, 30d, expiration
+   */
+  async calculateTimeCurves(legs, spotPrices) {
+    // Get days to expiry for the position (use first leg as reference)
+    const now = Date.now();
+    const expiryDate = legs[0].expiryDate;
+    const totalDTE = (expiryDate - now) / (1000 * 60 * 60 * 24);
+
+    console.log(`Calculating time curves. Total DTE: ${totalDTE.toFixed(1)} days`);
+
+    // Define time points (days before expiry)
+    const timePoints = [
+      { name: 'today', daysToExpiry: totalDTE, color: '#06b6d4', dash: false },
+      { name: '7d', daysToExpiry: Math.max(7, 0), color: '#10b981', dash: true },
+      { name: '14d', daysToExpiry: Math.max(14, 0), color: '#eab308', dash: true },
+      { name: '30d', daysToExpiry: Math.max(30, 0), color: '#f97316', dash: true },
+      { name: 'expiry', daysToExpiry: 0, color: '#ffffff', dash: false }
+    ];
+
+    // Filter out time points that are in the past or duplicate
+    const validTimePoints = [];
+    const seenDTE = new Set();
+    
+    for (const tp of timePoints) {
+      // Skip if DTE is greater than total DTE (in the past)
+      if (tp.daysToExpiry > totalDTE && tp.name !== 'today') {
+        console.log(`Skipping ${tp.name} (${tp.daysToExpiry}d) - beyond current time`);
+        continue;
+      }
+      
+      // Skip duplicates (e.g., if totalDTE < 7, 'today' and '7d' would be same)
+      const dtKey = tp.daysToExpiry.toFixed(1);
+      if (seenDTE.has(dtKey)) {
+        console.log(`Skipping ${tp.name} - duplicate DTE ${dtKey}`);
+        continue;
+      }
+      
+      seenDTE.add(dtKey);
+      validTimePoints.push(tp);
+    }
+
+    // Calculate P&L curve for each valid time point
+    const curves = [];
+    for (const tp of validTimePoints) {
+      const pnlData = await this.calculatePositionPnL(legs, spotPrices, tp.daysToExpiry);
+      curves.push({
+        name: tp.name,
+        daysToExpiry: tp.daysToExpiry,
+        color: tp.color,
+        dash: tp.dash,
+        data: pnlData
+      });
+      console.log(`Calculated ${tp.name} curve (DTE: ${tp.daysToExpiry.toFixed(1)})`);
+    }
+
+    return curves;
+  }
+
+  /**
    * Main calculation function - returns complete position analysis
    */
   async calculatePosition(legs, config = {}) {
     const {
       spotPrices = this.generateSpotRange(legs),
-      daysToExpiry = null
+      daysToExpiry = null,
+      includeTimeCurves = false
     } = config;
     
-    // Calculate P&L curve
+    // Calculate P&L curve (current time or specified)
     const pnlCurve = await this.calculatePositionPnL(legs, spotPrices, daysToExpiry);
     
     // Calculate Greeks
@@ -354,13 +415,20 @@ class PositionCalculatorService {
     // Calculate max profit/loss
     const { maxProfit, maxLoss } = await this.calculateMaxProfitLoss(legs, spotPrices);
     
+    // Calculate time curves if requested
+    let timeCurves = null;
+    if (includeTimeCurves) {
+      timeCurves = await this.calculateTimeCurves(legs, spotPrices);
+    }
+    
     return {
       pnlCurve,
       greeks,
       totalCost,
       breakevens,
       maxProfit,
-      maxLoss
+      maxLoss,
+      timeCurves
     };
   }
 
