@@ -129,6 +129,79 @@ const OptionsChain: React.FC = () => {
     }
   };
   
+  // Visual Enhancement Helpers
+  
+  // Get IV heatmap color
+  const getIVColor = (iv: number): string => {
+    const ivPercent = iv * 100;
+    
+    if (ivPercent < 40) {
+      // Green (low IV)
+      const intensity = Math.min(ivPercent / 40, 1);
+      return `rgba(34, 197, 94, ${0.1 + intensity * 0.2})`; // green-500
+    } else if (ivPercent < 60) {
+      // Yellow (medium IV)
+      const intensity = (ivPercent - 40) / 20;
+      return `rgba(234, 179, 8, ${0.15 + intensity * 0.25})`; // yellow-500
+    } else if (ivPercent < 80) {
+      // Orange (high IV)
+      const intensity = (ivPercent - 60) / 20;
+      return `rgba(249, 115, 22, ${0.2 + intensity * 0.3})`; // orange-500
+    } else {
+      // Red (very high IV)
+      const intensity = Math.min((ivPercent - 80) / 20, 1);
+      return `rgba(239, 68, 68, ${0.25 + intensity * 0.35})`; // red-500
+    }
+  };
+  
+  // Get price heatmap color
+  const getPriceColor = (price: number): string => {
+    if (price < 500) {
+      // Green (cheap)
+      return 'rgba(34, 197, 94, 0.1)';
+    } else if (price < 2000) {
+      // Yellow (medium)
+      return 'rgba(234, 179, 8, 0.15)';
+    } else if (price < 5000) {
+      // Orange (expensive)
+      return 'rgba(249, 115, 22, 0.2)';
+    } else {
+      // Red (very expensive)
+      return 'rgba(239, 68, 68, 0.25)';
+    }
+  };
+  
+  // Get moneyness row style
+  const getMoneynessRowClass = (callMoneyness: 'ITM' | 'ATM' | 'OTM', putMoneyness: 'ITM' | 'ATM' | 'OTM'): string => {
+    // ATM takes priority
+    if (callMoneyness === 'ATM' || putMoneyness === 'ATM') {
+      return 'bg-yellow-900/10';
+    }
+    
+    // ITM for either side
+    if (callMoneyness === 'ITM' || putMoneyness === 'ITM') {
+      return 'bg-green-900/5';
+    }
+    
+    // OTM (default)
+    return '';
+  };
+  
+  // Get volume bar width
+  const getVolumeBarWidth = (volume: number, maxVolume: number): number => {
+    if (maxVolume === 0) return 0;
+    return Math.min((volume / maxVolume) * 100, 100);
+  };
+  
+  // Calculate max volume for normalization
+  const getMaxVolume = (): number => {
+    const volumes = chainRows.flatMap(row => [
+      row.call?.volume || 0,
+      row.put?.volume || 0
+    ]);
+    return Math.max(...volumes, 1);
+  };
+  
   // Format helpers
   const formatPrice = (price: number): string => {
     return `$${price.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -155,6 +228,7 @@ const OptionsChain: React.FC = () => {
   
   const chainRows = buildChainRows();
   const expiries = getUniqueExpiries(options);
+  const maxVolume = getMaxVolume();
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
@@ -263,11 +337,16 @@ const OptionsChain: React.FC = () => {
                     <tr
                       key={row.strike}
                       className={`border-t border-slate-700 hover:bg-slate-700/30 transition-colors ${
-                        isAtm ? 'bg-yellow-900/10' : ''
+                        getMoneynessRowClass(callMoneyness, putMoneyness)
                       }`}
                     >
                       {/* Call Data */}
-                      <td className="px-4 py-3 text-sm text-gray-300">
+                      <td 
+                        className="px-4 py-3 text-sm text-gray-300 font-semibold"
+                        style={{
+                          backgroundColor: row.call ? getIVColor(row.call.markIV) : 'transparent'
+                        }}
+                      >
                         {row.call ? formatIV(row.call.markIV) : '-'}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-gray-300">
@@ -282,11 +361,26 @@ const OptionsChain: React.FC = () => {
                       <td className="px-4 py-3 text-sm text-right text-gray-300">
                         {row.call ? formatGreek(row.call.vega, 2) : '-'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-green-400">
+                      <td 
+                        className="px-4 py-3 text-sm text-right font-semibold text-green-400"
+                        style={{
+                          backgroundColor: row.call ? getPriceColor(row.call.markPrice) : 'transparent'
+                        }}
+                      >
                         {row.call ? formatPrice(row.call.markPrice) : '-'}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-gray-400">
-                        {row.call ? row.call.volume.toFixed(1) : '-'}
+                        <div className="relative">
+                          {row.call && row.call.volume > 0 && (
+                            <div 
+                              className="absolute inset-y-0 right-0 bg-cyan-500/20 rounded"
+                              style={{ width: `${getVolumeBarWidth(row.call.volume, maxVolume)}%` }}
+                            />
+                          )}
+                          <span className="relative z-10">
+                            {row.call ? row.call.volume.toFixed(1) : '-'}
+                          </span>
+                        </div>
                       </td>
                       
                       {/* Strike */}
@@ -299,9 +393,24 @@ const OptionsChain: React.FC = () => {
                       
                       {/* Put Data */}
                       <td className="px-4 py-3 text-sm text-left text-gray-400">
-                        {row.put ? row.put.volume.toFixed(1) : '-'}
+                        <div className="relative">
+                          {row.put && row.put.volume > 0 && (
+                            <div 
+                              className="absolute inset-y-0 left-0 bg-cyan-500/20 rounded"
+                              style={{ width: `${getVolumeBarWidth(row.put.volume, maxVolume)}%` }}
+                            />
+                          )}
+                          <span className="relative z-10">
+                            {row.put ? row.put.volume.toFixed(1) : '-'}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-left font-semibold text-red-400">
+                      <td 
+                        className="px-4 py-3 text-sm text-left font-semibold text-red-400"
+                        style={{
+                          backgroundColor: row.put ? getPriceColor(row.put.markPrice) : 'transparent'
+                        }}
+                      >
                         {row.put ? formatPrice(row.put.markPrice) : '-'}
                       </td>
                       <td className="px-4 py-3 text-sm text-left text-gray-300">
@@ -316,7 +425,12 @@ const OptionsChain: React.FC = () => {
                       <td className="px-4 py-3 text-sm text-left text-gray-300">
                         {row.put ? formatGreek(row.put.delta, 3) : '-'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-300">
+                      <td 
+                        className="px-4 py-3 text-sm text-gray-300 font-semibold"
+                        style={{
+                          backgroundColor: row.put ? getIVColor(row.put.markIV) : 'transparent'
+                        }}
+                      >
                         {row.put ? formatIV(row.put.markIV) : '-'}
                       </td>
                     </tr>
