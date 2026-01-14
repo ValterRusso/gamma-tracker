@@ -87,6 +87,9 @@ const OptionsTrade: React.FC = () => {
 
   // Current spot price (fetched from API)
   const [currentSpot, setCurrentSpot] = useState<number | null>(null);
+  
+  // Templates modal
+  const [showTemplates, setShowTemplates] = useState<boolean>(false);
 
   // Fetch available options and spot price on mount
   useEffect(() => {
@@ -302,6 +305,154 @@ const OptionsTrade: React.FC = () => {
     setAnalysis(null);
     setError(null);
   };
+  
+  const applyTemplate = (templateName: string) => {
+    // Clear existing legs
+    setLegs([]);
+    setAnalysis(null);
+    
+    // Get current spot price (estimate from ATM if not loaded)
+    const spot = currentSpot || 94000;
+    
+    // Find nearest expiry (first available)
+    const expiries = [...new Set(availableOptions.map(opt => opt.expiryDate))].sort();
+    if (expiries.length === 0) {
+      setError('No options available');
+      return;
+    }
+    const targetExpiry = expiries[0];
+    
+    // Filter options for target expiry
+    const expiryOptions = availableOptions.filter(opt => opt.expiryDate === targetExpiry);
+    
+    // Find ATM strike (closest to spot)
+    const atmStrike = expiryOptions
+      .map(opt => opt.strike)
+      .reduce((prev, curr) => 
+        Math.abs(curr - spot) < Math.abs(prev - spot) ? curr : prev
+      );
+    
+    // Find strikes around ATM
+    const strikes = [...new Set(expiryOptions.map(opt => opt.strike))].sort((a, b) => a - b);
+    const atmIndex = strikes.indexOf(atmStrike);
+    
+    let newLegs: Leg[] = [];
+    
+    switch (templateName) {
+      case 'bullCallSpread': {
+        // Buy ATM call, sell OTM call (1 strike higher)
+        const lowerStrike = atmStrike;
+        const higherStrike = strikes[Math.min(atmIndex + 1, strikes.length - 1)];
+        
+        const buyCall = expiryOptions.find(opt => opt.strike === lowerStrike && opt.side === 'CALL');
+        const sellCall = expiryOptions.find(opt => opt.strike === higherStrike && opt.side === 'CALL');
+        
+        if (buyCall) newLegs.push(createLeg(buyCall, 'buy'));
+        if (sellCall) newLegs.push(createLeg(sellCall, 'sell'));
+        break;
+      }
+      
+      case 'bearPutSpread': {
+        // Buy ATM put, sell OTM put (1 strike lower)
+        const higherStrike = atmStrike;
+        const lowerStrike = strikes[Math.max(atmIndex - 1, 0)];
+        
+        const buyPut = expiryOptions.find(opt => opt.strike === higherStrike && opt.side === 'PUT');
+        const sellPut = expiryOptions.find(opt => opt.strike === lowerStrike && opt.side === 'PUT');
+        
+        if (buyPut) newLegs.push(createLeg(buyPut, 'buy'));
+        if (sellPut) newLegs.push(createLeg(sellPut, 'sell'));
+        break;
+      }
+      
+      case 'longStraddle': {
+        // Buy ATM call + ATM put
+        const call = expiryOptions.find(opt => opt.strike === atmStrike && opt.side === 'CALL');
+        const put = expiryOptions.find(opt => opt.strike === atmStrike && opt.side === 'PUT');
+        
+        if (call) newLegs.push(createLeg(call, 'buy'));
+        if (put) newLegs.push(createLeg(put, 'buy'));
+        break;
+      }
+      
+      case 'longStrangle': {
+        // Buy OTM call + OTM put
+        const callStrike = strikes[Math.min(atmIndex + 1, strikes.length - 1)];
+        const putStrike = strikes[Math.max(atmIndex - 1, 0)];
+        
+        const call = expiryOptions.find(opt => opt.strike === callStrike && opt.side === 'CALL');
+        const put = expiryOptions.find(opt => opt.strike === putStrike && opt.side === 'PUT');
+        
+        if (call) newLegs.push(createLeg(call, 'buy'));
+        if (put) newLegs.push(createLeg(put, 'buy'));
+        break;
+      }
+      
+      case 'ironCondor': {
+        // Bull put spread + bear call spread
+        // Sell put at ATM-1, buy put at ATM-2
+        // Sell call at ATM+1, buy call at ATM+2
+        const sellPutStrike = strikes[Math.max(atmIndex - 1, 0)];
+        const buyPutStrike = strikes[Math.max(atmIndex - 2, 0)];
+        const sellCallStrike = strikes[Math.min(atmIndex + 1, strikes.length - 1)];
+        const buyCallStrike = strikes[Math.min(atmIndex + 2, strikes.length - 1)];
+        
+        const buyPut = expiryOptions.find(opt => opt.strike === buyPutStrike && opt.side === 'PUT');
+        const sellPut = expiryOptions.find(opt => opt.strike === sellPutStrike && opt.side === 'PUT');
+        const sellCall = expiryOptions.find(opt => opt.strike === sellCallStrike && opt.side === 'CALL');
+        const buyCall = expiryOptions.find(opt => opt.strike === buyCallStrike && opt.side === 'CALL');
+        
+        if (buyPut) newLegs.push(createLeg(buyPut, 'buy'));
+        if (sellPut) newLegs.push(createLeg(sellPut, 'sell'));
+        if (sellCall) newLegs.push(createLeg(sellCall, 'sell'));
+        if (buyCall) newLegs.push(createLeg(buyCall, 'buy'));
+        break;
+      }
+      
+      case 'butterfly': {
+        // Buy 1 lower wing, sell 2 body, buy 1 upper wing (calls)
+        const lowerStrike = strikes[Math.max(atmIndex - 1, 0)];
+        const middleStrike = atmStrike;
+        const upperStrike = strikes[Math.min(atmIndex + 1, strikes.length - 1)];
+        
+        const lowerCall = expiryOptions.find(opt => opt.strike === lowerStrike && opt.side === 'CALL');
+        const middleCall = expiryOptions.find(opt => opt.strike === middleStrike && opt.side === 'CALL');
+        const upperCall = expiryOptions.find(opt => opt.strike === upperStrike && opt.side === 'CALL');
+        
+        if (lowerCall) newLegs.push(createLeg(lowerCall, 'buy'));
+        if (middleCall) {
+          newLegs.push(createLeg(middleCall, 'sell'));
+          newLegs.push(createLeg(middleCall, 'sell'));
+        }
+        if (upperCall) newLegs.push(createLeg(upperCall, 'buy'));
+        break;
+      }
+    }
+    
+    if (newLegs.length > 0) {
+      setLegs(newLegs);
+      setShowTemplates(false);
+      setError(null);
+    } else {
+      setError('Could not find suitable options for this template');
+    }
+  };
+  
+  // Helper function to create a leg from an option
+  const createLeg = (option: OptionData, action: 'buy' | 'sell'): Leg => ({
+    symbol: option.symbol,
+    underlying: option.underlying,
+    strike: option.strike,
+    expiryDate: option.expiryDate,
+    side: option.side,
+    action,
+    quantity: 1,
+    entryPrice: option.markPrice,
+    delta: option.delta,
+    gamma: option.gamma,
+    theta: option.theta,
+    vega: option.vega,
+  });
 
   const handleSavePosition = () => {
     const positionName = prompt('Enter position name:');
@@ -558,6 +709,13 @@ const OptionsTrade: React.FC = () => {
           >
             <Plus className="w-4 h-4" />
             Add Leg
+          </button>
+          <button
+            onClick={() => setShowTemplates(true)}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <TrendingUp className="w-4 h-4" />
+            Templates
           </button>
           <button
             onClick={handleClearAll}
@@ -910,6 +1068,101 @@ const OptionsTrade: React.FC = () => {
           <TrendingUp className="w-16 h-16 mx-auto mb-4 opacity-50" />
           <p className="text-lg">No legs added yet</p>
           <p className="text-sm mt-2">Select an option above to start building your position</p>
+        </div>
+      )}
+      
+      {/* Templates Modal */}
+      {showTemplates && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-slate-700">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">Position Templates</h2>
+              <button
+                onClick={() => setShowTemplates(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Bull Call Spread */}
+              <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600 hover:border-green-500 transition-colors cursor-pointer"
+                   onClick={() => applyTemplate('bullCallSpread')}>
+                <h3 className="text-lg font-semibold text-green-400 mb-2">Bull Call Spread</h3>
+                <p className="text-sm text-gray-400 mb-3">Buy lower strike call, sell higher strike call</p>
+                <div className="text-xs text-gray-500">
+                  <div>• Limited profit, limited risk</div>
+                  <div>• Bullish strategy</div>
+                  <div>• Lower cost than long call</div>
+                </div>
+              </div>
+              
+              {/* Bear Put Spread */}
+              <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600 hover:border-red-500 transition-colors cursor-pointer"
+                   onClick={() => applyTemplate('bearPutSpread')}>
+                <h3 className="text-lg font-semibold text-red-400 mb-2">Bear Put Spread</h3>
+                <p className="text-sm text-gray-400 mb-3">Buy higher strike put, sell lower strike put</p>
+                <div className="text-xs text-gray-500">
+                  <div>• Limited profit, limited risk</div>
+                  <div>• Bearish strategy</div>
+                  <div>• Lower cost than long put</div>
+                </div>
+              </div>
+              
+              {/* Long Straddle */}
+              <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600 hover:border-yellow-500 transition-colors cursor-pointer"
+                   onClick={() => applyTemplate('longStraddle')}>
+                <h3 className="text-lg font-semibold text-yellow-400 mb-2">Long Straddle</h3>
+                <p className="text-sm text-gray-400 mb-3">Buy ATM call + ATM put (same strike)</p>
+                <div className="text-xs text-gray-500">
+                  <div>• Unlimited profit, limited risk</div>
+                  <div>• Profits from large moves</div>
+                  <div>• High cost (theta decay)</div>
+                </div>
+              </div>
+              
+              {/* Long Strangle */}
+              <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600 hover:border-orange-500 transition-colors cursor-pointer"
+                   onClick={() => applyTemplate('longStrangle')}>
+                <h3 className="text-lg font-semibold text-orange-400 mb-2">Long Strangle</h3>
+                <p className="text-sm text-gray-400 mb-3">Buy OTM call + OTM put (different strikes)</p>
+                <div className="text-xs text-gray-500">
+                  <div>• Unlimited profit, limited risk</div>
+                  <div>• Lower cost than straddle</div>
+                  <div>• Needs bigger move to profit</div>
+                </div>
+              </div>
+              
+              {/* Iron Condor */}
+              <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600 hover:border-purple-500 transition-colors cursor-pointer"
+                   onClick={() => applyTemplate('ironCondor')}>
+                <h3 className="text-lg font-semibold text-purple-400 mb-2">Iron Condor</h3>
+                <p className="text-sm text-gray-400 mb-3">Bull put spread + bear call spread</p>
+                <div className="text-xs text-gray-500">
+                  <div>• Limited profit, limited risk</div>
+                  <div>• Profits from low volatility</div>
+                  <div>• 4 legs (complex)</div>
+                </div>
+              </div>
+              
+              {/* Butterfly */}
+              <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600 hover:border-blue-500 transition-colors cursor-pointer"
+                   onClick={() => applyTemplate('butterfly')}>
+                <h3 className="text-lg font-semibold text-blue-400 mb-2">Butterfly Spread</h3>
+                <p className="text-sm text-gray-400 mb-3">Buy 2 wings, sell 2 body (calls or puts)</p>
+                <div className="text-xs text-gray-500">
+                  <div>• Limited profit, limited risk</div>
+                  <div>• Profits if price stays near middle strike</div>
+                  <div>• Low cost, low risk</div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 text-sm text-gray-400">
+              <p>💡 <strong>Tip:</strong> After applying a template, you can adjust strikes and quantities manually.</p>
+            </div>
+          </div>
         </div>
       )}
     </div>
