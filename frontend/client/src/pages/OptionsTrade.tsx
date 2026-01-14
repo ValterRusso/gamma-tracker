@@ -97,7 +97,7 @@ const OptionsTrade: React.FC = () => {
   
   // Templates modal
   const [showTemplates, setShowTemplates] = useState(false);
-  const [selectedTemplateExpiry, setSelectedTemplateExpiry] = useState<string | null>(null);>(false);
+  const [selectedTemplateExpiry, setSelectedTemplateExpiry] = useState<string | null>(null);
 
   // Fetch available options and spot price on mount
   useEffect(() => {
@@ -331,7 +331,7 @@ const OptionsTrade: React.FC = () => {
     
     // Use selectedTemplateExpiry if set, otherwise use nearest (day trade mode)
     const targetExpiry = selectedTemplateExpiry 
-      ? new Date(selectedTemplateExpiry).getTime()
+      ? Number(selectedTemplateExpiry)
       : expiries[0];
     
     // Filter options for target expiry
@@ -1109,7 +1109,7 @@ const OptionsTrade: React.FC = () => {
               >
                 <option value="">Quick Add (Nearest Expiry - Day Trade)</option>
                 {availableOptions
-                  .map(opt => opt.expiry)
+                  .map(opt => opt.expiryDate)
                   .filter((v, i, a) => a.indexOf(v) === i)
                   .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
                   .map(expiry => {
