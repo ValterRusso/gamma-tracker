@@ -34,6 +34,7 @@ const gexHeatmapRoutes = require('./gex-heatmap.routes');
 const dexHeatmapRoutes = require('./dex-heatmap.routes');
 const dvolRoutes = require('./dvol.routes');
 const positionsRoutes = require('./positions.routes');
+const botRoutes = require('./bot.routes');
 
 module.exports = (dependencies) => {
   // Mount all routes
@@ -54,6 +55,7 @@ module.exports = (dependencies) => {
   router.use(dexHeatmapRoutes(dependencies));       // 4 endpoints
   router.use(dvolRoutes(dependencies));             // 4 endpoints
   router.use(positionsRoutes(dependencies));        // 4 endpoints
+  router.use(botRoutes(dependencies));              // 12 endpoints
   
   return router;
 };
