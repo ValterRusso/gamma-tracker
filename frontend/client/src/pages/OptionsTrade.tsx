@@ -764,7 +764,28 @@ const OptionsTrade: React.FC = () => {
                 />
                 <ReferenceLine y={0} stroke="#64748b" strokeDasharray="3 3" />
                 
-                {/* Current Spot Marker */}
+                {/* Breakeven markers - RENDER FIRST (behind) */}
+                {analysis.breakevens.map((be, idx) => {
+                  console.log('[Chart] Rendering breakeven at:', be);
+                  return (
+                    <ReferenceLine 
+                      key={`be-${idx}`}
+                      x={be} 
+                      stroke="#f59e0b" 
+                      strokeWidth={3}
+                      strokeDasharray="5 5"
+                      label={{
+                        value: 'BE',
+                        position: 'top',
+                        fill: '#f59e0b',
+                        fontSize: 12,
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  );
+                })}
+                
+                {/* Current Spot Marker - RENDER SECOND (in front) */}
                 {currentSpot && (() => {
                   console.log('[Chart] Rendering current spot marker at:', currentSpot);
                   return (
@@ -783,22 +804,6 @@ const OptionsTrade: React.FC = () => {
                     />
                   );
                 })()}
-                
-                {/* Breakeven markers */}
-                {analysis.breakevens.map((be, idx) => (
-                  <ReferenceLine 
-                    key={`be-${idx}`}
-                    x={be} 
-                    stroke="#f59e0b" 
-                    strokeDasharray="5 5"
-                    label={{
-                      value: 'BE',
-                      position: 'top',
-                      fill: '#f59e0b',
-                      fontSize: 12
-                    }}
-                  />
-                ))}
                 
                 {/* P&L Area - Split into profit and loss */}
                 <Area
