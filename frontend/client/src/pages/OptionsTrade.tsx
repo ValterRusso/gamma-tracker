@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Save, FolderOpen, TrendingUp } from 'lucide-react';
 import { useLocation } from 'wouter';
 import {
+  ComposedChart,
   AreaChart,
   Area,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -237,7 +239,12 @@ const OptionsTrade: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ legs }),
+        body: JSON.stringify({ 
+          legs,
+          config: {
+            includeTimeCurves: true  // Request time curves
+          }
+        }),
       });
 
       const data = await response.json();
@@ -730,7 +737,7 @@ const OptionsTrade: React.FC = () => {
           
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={analysis.pnlCurve}>
+              <ComposedChart data={analysis.pnlCurve}>
                 <defs>
                   <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
@@ -820,27 +827,70 @@ const OptionsTrade: React.FC = () => {
                   strokeWidth={2}
                   fill="url(#lossGradient)"
                 />
-              </AreaChart>
+                
+                {/* Time Curves - Multiple lines showing P&L at different times */}
+                {analysis.timeCurves && analysis.timeCurves.map((curve: any) => (
+                  <Line
+                    key={curve.name}
+                    type="monotone"
+                    data={curve.data}
+                    dataKey="pnl"
+                    stroke={curve.color}
+                    strokeWidth={curve.dash ? 1.5 : 2}
+                    strokeDasharray={curve.dash ? "5 5" : "0"}
+                    dot={false}
+                    name={curve.name}
+                    connectNulls
+                  />
+                ))}
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
           
-          <div className="mt-4 flex items-center gap-6 text-sm text-gray-400">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded"></div>
-              <span>Profit Zone</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-red-500 rounded"></div>
-              <span>Loss Zone</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-orange-500 rounded"></div>
-              <span>Breakeven</span>
-            </div>
-            {currentSpot && (
+          {/* Legend */}
+          <div className="mt-4 space-y-3">
+            {/* Zones */}
+            <div className="flex items-center gap-6 text-sm text-gray-400">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-purple-500 rounded"></div>
-                <span>Current Spot</span>
+                <div className="w-3 h-3 bg-green-500 rounded"></div>
+                <span>Profit Zone</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-red-500 rounded"></div>
+                <span>Loss Zone</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-orange-500 rounded"></div>
+                <span>Breakeven</span>
+              </div>
+              {currentSpot && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-purple-500 rounded"></div>
+                  <span>Current Spot</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Time Curves */}
+            {analysis.timeCurves && analysis.timeCurves.length > 0 && (
+              <div className="flex items-center gap-6 text-sm text-gray-400">
+                <span className="font-semibold text-gray-300">Time Evolution:</span>
+                {analysis.timeCurves.map((curve: any) => (
+                  <div key={curve.name} className="flex items-center gap-2">
+                    <div 
+                      className="w-8 h-0.5" 
+                      style={{ 
+                        backgroundColor: curve.color,
+                        borderTop: curve.dash ? `2px dashed ${curve.color}` : 'none'
+                      }}
+                    ></div>
+                    <span className="capitalize">
+                      {curve.name === 'today' ? `Today (${curve.daysToExpiry.toFixed(0)}d)` :
+                       curve.name === 'expiry' ? 'Expiration' :
+                       curve.name}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
