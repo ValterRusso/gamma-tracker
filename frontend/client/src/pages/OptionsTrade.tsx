@@ -65,6 +65,13 @@ interface PositionAnalysis {
   breakevens: number[];
   maxProfit: number;
   maxLoss: number;
+  timeCurves?: Array<{
+    name: string;
+    daysToExpiry: number;
+    color: string;
+    dash?: boolean;
+    data: { price: number; pnl: number }[];
+  }>;
 }
 
 const OptionsTrade: React.FC = () => {
