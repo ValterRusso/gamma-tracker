@@ -730,10 +730,7 @@ const OptionsTrade: React.FC = () => {
           
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart 
-                data={analysis.pnlCurve}
-                key={`chart-${currentSpot || 'loading'}`}
-              >
+              <AreaChart data={analysis.pnlCurve}>
                 <defs>
                   <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
