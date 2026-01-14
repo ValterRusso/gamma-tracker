@@ -116,6 +116,28 @@ const OptionsTrade: React.FC = () => {
     fetchCurrentSpot();
   }, []);
 
+  // Check for pending leg from Options Chain
+  useEffect(() => {
+    const pendingLeg = localStorage.getItem('pendingLeg');
+    if (pendingLeg) {
+      try {
+        const legData = JSON.parse(pendingLeg);
+        console.log('[OptionsTrade] Adding pending leg from Options Chain:', legData);
+        
+        // Add leg to position
+        setLegs(prev => [...prev, legData]);
+        
+        // Clear localStorage
+        localStorage.removeItem('pendingLeg');
+        
+        // Show success message
+        console.log(`[OptionsTrade] Successfully added ${legData.action} ${legData.side} @ ${legData.strike}`);
+      } catch (e) {
+        console.error('[OptionsTrade] Failed to parse pending leg:', e);
+      }
+    }
+  }, []);
+
   // Fetch current spot price
   const fetchCurrentSpot = async () => {
     // Prevent multiple fetches
