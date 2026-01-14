@@ -340,18 +340,24 @@ const OptionsChain: React.FC = () => {
   // Click handlers
   const handleOptionClick = (option: OptionData, action: 'BUY' | 'SELL') => {
     // Save to localStorage for OptionsTrade page to pick up
+    // Must match Leg interface in OptionsTrade.tsx
     const leg = {
       symbol: option.symbol,
+      underlying: option.underlying,
       strike: option.strike,
-      expiry: option.expiryDate,
-      type: option.side,
-      action: action,
+      expiryDate: option.expiryDate,
+      side: option.side,
+      action: action.toLowerCase() as 'buy' | 'sell',
       quantity: 1,
-      price: option.markPrice
+      entryPrice: option.markPrice,
+      delta: option.delta,
+      gamma: option.gamma,
+      theta: option.theta,
+      vega: option.vega
     };
     
     localStorage.setItem('pendingLeg', JSON.stringify(leg));
-    toast.success(`${action === 'BUY' ? 'Buying' : 'Selling'} ${option.side} added to position`);
+    toast.success(`${action === 'BUY' ? 'Buying' : 'Selling'} ${option.side} @ $${option.strike} added to position`);
     
     // Redirect to options trade page
     setTimeout(() => {
