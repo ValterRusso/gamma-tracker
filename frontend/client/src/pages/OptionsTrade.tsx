@@ -116,18 +116,31 @@ const OptionsTrade: React.FC = () => {
     fetchCurrentSpot();
   }, []);
 
-  // Check for pending leg from Options Chain
+  // Load saved position and check for pending leg from Options Chain
   useEffect(() => {
+    // First, load any saved position from localStorage
+    const savedPosition = localStorage.getItem('currentPosition');
+    if (savedPosition) {
+      try {
+        const savedLegs = JSON.parse(savedPosition);
+        console.log('[OptionsTrade] Loading saved position:', savedLegs.length, 'legs');
+        setLegs(savedLegs);
+      } catch (e) {
+        console.error('[OptionsTrade] Failed to load saved position:', e);
+      }
+    }
+    
+    // Then, check for pending leg from Options Chain
     const pendingLeg = localStorage.getItem('pendingLeg');
     if (pendingLeg) {
       try {
         const legData = JSON.parse(pendingLeg);
         console.log('[OptionsTrade] Adding pending leg from Options Chain:', legData);
         
-        // Add leg to position
+        // Add leg to position (will be merged with saved position)
         setLegs(prev => [...prev, legData]);
         
-        // Clear localStorage
+        // Clear pending leg from localStorage
         localStorage.removeItem('pendingLeg');
         
         // Show success message
@@ -137,6 +150,17 @@ const OptionsTrade: React.FC = () => {
       }
     }
   }, []);
+
+  // Save legs to localStorage whenever they change
+  useEffect(() => {
+    if (legs.length > 0) {
+      localStorage.setItem('currentPosition', JSON.stringify(legs));
+      console.log('[OptionsTrade] Saved position to localStorage:', legs.length, 'legs');
+    } else {
+      localStorage.removeItem('currentPosition');
+      console.log('[OptionsTrade] Cleared position from localStorage');
+    }
+  }, [legs]);
 
   // Fetch current spot price
   const fetchCurrentSpot = async () => {
@@ -409,11 +433,14 @@ const OptionsTrade: React.FC = () => {
   const handleRemoveLeg = (index: number) => {
     setLegs(legs.filter((_, i) => i !== index));
   };
-
   const handleClearAll = () => {
-    setLegs([]);
-    setAnalysis(null);
-    setError(null);
+    if (legs.length === 0) return;
+    
+    if (confirm('Clear all legs from position?')) {
+      setLegs([]);
+      localStorage.removeItem('currentPosition');
+      console.log('[OptionsTrade] Cleared all legs');
+    }
   };
   
   const applyTemplate = (templateName: string) => {
