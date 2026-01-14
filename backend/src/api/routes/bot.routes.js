@@ -378,7 +378,7 @@ module.exports = (dependencies) => {
       const BotConfig = database.getModel('BotConfig');
       
       const configs = await BotConfig.findAll({
-        order: [['createdAt', 'DESC']]
+        order: [['created_at', 'DESC']]
       });
       
       res.json({
