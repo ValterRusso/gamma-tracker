@@ -51,7 +51,8 @@ const navigationSections: NavSection[] = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
       { id: 'GEXHeatmap', label: 'GEXHeatmap', icon: TrendingUp, path: '/gex-heatmap' },
       { id: 'volatility-index', label: 'Volatility Index', icon: TrendingUp, path: '/volatility-index' },
-      { id: 'options-trade', label: 'Options Trade', icon: Target, path: '/options-trade' }
+      { id: 'options-trade', label: 'Options Trade', icon: Target, path: '/options-trade' },
+      { id: 'options-chain', label: 'Options Chain', icon: Shield, path: '/options-chain' }
     ]
   },
   {
