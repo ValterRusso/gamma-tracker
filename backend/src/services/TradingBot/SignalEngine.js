@@ -5,7 +5,8 @@ const Logger = require('../../utils/logger');
  * Analyzes market data and generates trading signals based on mathematical rules
  */
 class SignalEngine {
-  constructor(database, optionsService) {
+  constructor(config, database, optionsService) {
+    this.config = config;
     this.db = database;
     this.optionsService = optionsService;
     this.logger = new Logger('SignalEngine');
@@ -13,12 +14,11 @@ class SignalEngine {
 
   /**
    * Analyze market and generate signal
-   * @param {Object} config - Bot configuration with entry rules
    * @returns {Promise<Object>} Signal object
    */
-  async analyzeMarket(config) {
+  async analyzeMarket() {
     try {
-      this.logger.info(`[SignalEngine] Analyzing market for strategy: ${config.strategy}`);
+      this.logger.info(`[SignalEngine] Analyzing market for strategy: ${this.config.strategy}`);
       
       // 1. Fetch current market data
       const marketData = await this.fetchMarketData();
@@ -30,7 +30,7 @@ class SignalEngine {
       const regime = this.detectRegime(indicators);
       
       // 4. Check entry rules
-      const signal = this.checkEntryRules(config.entryRules, indicators, regime);
+      const signal = this.checkEntryRules(this.config, indicators, regime);
       
       // 5. Save signal to database
       await this.saveSignal(signal, marketData);
@@ -193,7 +193,16 @@ class SignalEngine {
   /**
    * Check entry rules against indicators
    */
-  checkEntryRules(entryRules, indicators, regime) {
+  checkEntryRules(config, indicators, regime) {
+    const entryRules = {
+      ivRank: { min: config.ivRankMin || 50, max: config.ivRankMax || 100 },
+      minVolume: config.volumeMin || 0,
+      strategy: config.strategy || 'iron_condor',
+      dte: { min: config.dteMin || 30, max: config.dteMax || 45 },
+      shortCallDelta: -Math.abs(config.shortDelta || 0.16),
+      shortPutDelta: Math.abs(config.shortDelta || 0.16),
+      wingWidth: config.wingWidth || 5000
+    };
     const { ivRank, atmOptions, totalVolume } = indicators;
     
     // Check IV Rank requirement

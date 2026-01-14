@@ -13,10 +13,10 @@ class TradingBotService {
     this.optionsService = optionsService;
     this.logger = new Logger('TradingBotService');
     
-    // Initialize engines
-    this.signalEngine = new SignalEngine(database, optionsService);
-    this.executionEngine = new ExecutionEngine(database, optionsService);
-    this.positionMonitor = new PositionMonitor(database, optionsService, this.executionEngine);
+    // Engines will be initialized when bot starts (need config first)
+    this.signalEngine = null;
+    this.executionEngine = null;
+    this.positionMonitor = null;
     
     // Bot state
     this.isRunning = false;
@@ -47,6 +47,11 @@ class TradingBotService {
       }
       
       this.logger.info(`[TradingBot] Starting bot with config: ${this.config.name}`);
+      
+      // Initialize engines with config
+      this.signalEngine = new SignalEngine(this.config, this.db, this.optionsService);
+      this.executionEngine = new ExecutionEngine(this.config, this.db, this.optionsService);
+      this.positionMonitor = new PositionMonitor(this.config, this.db, this.optionsService, this.executionEngine);
       
       // Set running state
       this.isRunning = true;
@@ -132,7 +137,7 @@ class TradingBotService {
       this.logger.info('[TradingBot] === Running iteration ===');
       
       // 1. Monitor existing positions (check exits first)
-      const exitActions = await this.positionMonitor.monitorPositions(this.config);
+      const exitActions = await this.positionMonitor.monitorPositions();
       
       if (exitActions.length > 0) {
         this.logger.info(`[TradingBot] Closed ${exitActions.length} position(s)`);
@@ -147,7 +152,7 @@ class TradingBotService {
       }
       
       // 3. Generate entry signal
-      const signal = await this.signalEngine.analyzeMarket(this.config);
+      const signal = await this.signalEngine.analyzeMarket();
       
       this.logger.info(`[TradingBot] Signal: ${signal.signalType} (${signal.strategy || 'none'})`);
       
@@ -155,7 +160,7 @@ class TradingBotService {
       if (signal.signalType === 'entry' && signal.strategy) {
         this.logger.info(`[TradingBot] Executing entry for ${signal.strategy}...`);
         
-        const trade = await this.executionEngine.executeEntry(signal, this.config);
+        const trade = await this.executionEngine.executeEntry(signal);
         
         this.logger.info(`[TradingBot] Trade entered: ${trade.id}`);
         

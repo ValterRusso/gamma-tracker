@@ -5,7 +5,8 @@ const Logger = require('../../utils/logger');
  * Simulates order execution with realistic slippage and fills
  */
 class ExecutionEngine {
-  constructor(database, optionsService) {
+  constructor(config, database, optionsService) {
+    this.config = config;
     this.db = database;
     this.optionsService = optionsService;
     this.logger = new Logger('ExecutionEngine');
@@ -14,10 +15,9 @@ class ExecutionEngine {
   /**
    * Execute strategy entry (simulated)
    * @param {Object} signal - Signal from SignalEngine
-   * @param {Object} config - Bot configuration
    * @returns {Promise<Object>} Trade object
    */
-  async executeEntry(signal, config) {
+  async executeEntry(signal) {
     try {
       this.logger.info(`[ExecutionEngine] Executing entry for ${signal.strategy}`);
       
@@ -45,8 +45,7 @@ class ExecutionEngine {
         legs: executedLegs,
         metrics: positionMetrics,
         greeks: positionGreeks,
-        marketData,
-        config
+        marketData
       });
       
       this.logger.info(`[ExecutionEngine] Trade created: ${trade.id}`);
@@ -301,7 +300,7 @@ class ExecutionEngine {
   /**
    * Create trade record in database
    */
-  async createTradeRecord({ strategy, legs, metrics, greeks, marketData, config }) {
+  async createTradeRecord({ strategy, legs, metrics, greeks, marketData }) {
     const BotTrade = this.db.getModel('BotTrade');
     
     const trade = await BotTrade.create({
@@ -315,7 +314,7 @@ class ExecutionEngine {
       entryCredit: metrics.netCredit,
       legs: legs,
       entryGreeks: greeks,
-      notes: `Auto-entered by bot. Config: ${config.name}`
+      notes: `Auto-entered by bot. Strategy: ${this.config.strategy}`
     });
     
     return trade;

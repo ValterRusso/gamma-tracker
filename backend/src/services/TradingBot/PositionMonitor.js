@@ -5,7 +5,8 @@ const Logger = require('../../utils/logger');
  * Monitors active positions and checks exit conditions
  */
 class PositionMonitor {
-  constructor(database, optionsService, executionEngine) {
+  constructor(config, database, optionsService, executionEngine) {
+    this.config = config;
     this.db = database;
     this.optionsService = optionsService;
     this.executionEngine = executionEngine;
@@ -14,10 +15,9 @@ class PositionMonitor {
 
   /**
    * Monitor all active positions
-   * @param {Object} config - Bot configuration with exit rules
    * @returns {Promise<Array>} Array of exit actions taken
    */
-  async monitorPositions(config) {
+  async monitorPositions() {
     try {
       this.logger.info('[PositionMonitor] Checking active positions...');
       
@@ -38,7 +38,7 @@ class PositionMonitor {
       const exitActions = [];
       
       for (const trade of activeTrades) {
-        const exitSignal = await this.checkExitConditions(trade, config.exitRules, marketData);
+        const exitSignal = await this.checkExitConditions(trade, marketData);
         
         if (exitSignal.shouldExit) {
           this.logger.info(`[PositionMonitor] Exit signal for trade ${trade.id}: ${exitSignal.reason}`);
@@ -114,8 +114,17 @@ class PositionMonitor {
   /**
    * Check exit conditions for a trade
    */
-  async checkExitConditions(trade, exitRules, marketData) {
+  async checkExitConditions(trade, marketData) {
     const { spot, options } = marketData;
+    
+    // Build exit rules from config
+    const exitRules = {
+      profitTarget: this.config.profitTargetPct || 0.5,
+      stopLoss: this.config.stopLossPct || 2.0,
+      dteExit: this.config.dteExit || 21,
+      deltaThreshold: this.config.deltaThreshold || 0.30,
+      ivRankChange: this.config.ivRankChange || null
+    };
     
     // 1. Calculate current P&L
     const currentPnL = await this.calculateCurrentPnL(trade, options);
