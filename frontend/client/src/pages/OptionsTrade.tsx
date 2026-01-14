@@ -96,7 +96,8 @@ const OptionsTrade: React.FC = () => {
   const [currentSpot, setCurrentSpot] = useState<number | null>(null);
   
   // Templates modal
-  const [showTemplates, setShowTemplates] = useState<boolean>(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [selectedTemplateExpiry, setSelectedTemplateExpiry] = useState<string | null>(null);>(false);
 
   // Fetch available options and spot price on mount
   useEffect(() => {
@@ -321,13 +322,17 @@ const OptionsTrade: React.FC = () => {
     // Get current spot price (estimate from ATM if not loaded)
     const spot = currentSpot || 94000;
     
-    // Find nearest expiry (first available)
+    // Determine target expiry: use selected or nearest
     const expiries = [...new Set(availableOptions.map(opt => opt.expiryDate))].sort();
     if (expiries.length === 0) {
       setError('No options available');
       return;
     }
-    const targetExpiry = expiries[0];
+    
+    // Use selectedTemplateExpiry if set, otherwise use nearest (day trade mode)
+    const targetExpiry = selectedTemplateExpiry 
+      ? new Date(selectedTemplateExpiry).getTime()
+      : expiries[0];
     
     // Filter options for target expiry
     const expiryOptions = availableOptions.filter(opt => opt.expiryDate === targetExpiry);
@@ -1090,6 +1095,37 @@ const OptionsTrade: React.FC = () => {
               >
                 ✕
               </button>
+            </div>
+            
+            {/* Expiry Selection */}
+            <div className="mb-6 bg-slate-700/30 rounded-lg p-4 border border-slate-600">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Select Expiry Date
+              </label>
+              <select
+                value={selectedTemplateExpiry || ''}
+                onChange={(e) => setSelectedTemplateExpiry(e.target.value || null)}
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="">Quick Add (Nearest Expiry - Day Trade)</option>
+                {availableOptions
+                  .map(opt => opt.expiry)
+                  .filter((v, i, a) => a.indexOf(v) === i)
+                  .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+                  .map(expiry => {
+                    const dte = Math.round((new Date(expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                    return (
+                      <option key={expiry} value={expiry}>
+                        {new Date(expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ({dte} DTE)
+                      </option>
+                    );
+                  })}
+              </select>
+              <p className="text-xs text-gray-500 mt-2">
+                {selectedTemplateExpiry 
+                  ? '📊 Position Trade: Select strategy below to apply with chosen expiry'
+                  : '⚡ Day Trade: Click any strategy for quick setup with nearest expiry'}
+              </p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
