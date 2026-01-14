@@ -74,6 +74,14 @@ interface PositionAnalysis {
   }>;
 }
 
+interface GreeksEvolutionData {
+  price: number;
+  delta: number;
+  gamma: number;
+  theta: number;
+  vega: number;
+}
+
 const OptionsTrade: React.FC = () => {
   const [, setLocation] = useLocation();
   
@@ -98,6 +106,9 @@ const OptionsTrade: React.FC = () => {
   // Templates modal
   const [showTemplates, setShowTemplates] = useState(false);
   const [selectedTemplateExpiry, setSelectedTemplateExpiry] = useState<string | null>(null);
+  
+  // Greeks Evolution data
+  const [greeksEvolution, setGreeksEvolution] = useState<GreeksEvolutionData[]>([]);
 
   // Fetch available options and spot price on mount
   useEffect(() => {
@@ -272,6 +283,75 @@ const OptionsTrade: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // ============================================================================
+  // GREEKS EVOLUTION CALCULATION
+  // ============================================================================
+  
+  const calculateGreeksEvolution = () => {
+    if (legs.length === 0 || !currentSpot) {
+      setGreeksEvolution([]);
+      return;
+    }
+    
+    // Calculate current position Greeks (weighted sum)
+    const positionGreeks = legs.reduce((acc, leg) => {
+      const multiplier = leg.action === 'buy' ? leg.quantity : -leg.quantity;
+      return {
+        delta: acc.delta + leg.delta * multiplier,
+        gamma: acc.gamma + leg.gamma * multiplier,
+        theta: acc.theta + leg.theta * multiplier,
+        vega: acc.vega + leg.vega * multiplier,
+      };
+    }, { delta: 0, gamma: 0, theta: 0, vega: 0 });
+    
+    // Generate price range (±30% from current spot)
+    const minPrice = currentSpot * 0.7;
+    const maxPrice = currentSpot * 1.3;
+    const numPoints = 100;
+    const priceStep = (maxPrice - minPrice) / (numPoints - 1);
+    
+    const evolutionData: GreeksEvolutionData[] = [];
+    
+    for (let i = 0; i < numPoints; i++) {
+      const price = minPrice + i * priceStep;
+      const spotDelta = price - currentSpot;
+      
+      // Approximate Greeks at this spot price
+      // Delta changes linearly with spot (first-order approximation)
+      const delta = positionGreeks.delta + positionGreeks.gamma * spotDelta;
+      
+      // Gamma changes with moneyness (decreases as we move away from ATM)
+      // Use exponential decay based on distance from current spot
+      const moneynessDistance = Math.abs(spotDelta) / currentSpot;
+      const gammaDecay = Math.exp(-moneynessDistance * 3); // Decay factor
+      const gamma = positionGreeks.gamma * gammaDecay;
+      
+      // Theta is relatively stable but increases slightly OTM
+      // (options lose value faster when OTM)
+      const thetaAdjustment = 1 + moneynessDistance * 0.5;
+      const theta = positionGreeks.theta * thetaAdjustment;
+      
+      // Vega is highest ATM, decreases as we move away
+      const vegaDecay = Math.exp(-moneynessDistance * 2);
+      const vega = positionGreeks.vega * vegaDecay;
+      
+      evolutionData.push({
+        price: Math.round(price),
+        delta: Number(delta.toFixed(4)),
+        gamma: Number(gamma.toFixed(6)),
+        theta: Number(theta.toFixed(2)),
+        vega: Number(vega.toFixed(2)),
+      });
+    }
+    
+    setGreeksEvolution(evolutionData);
+  };
+  
+  // Recalculate Greeks Evolution when legs or spot changes
+  useEffect(() => {
+    calculateGreeksEvolution();
+  }, [legs, currentSpot]);
 
   // ============================================================================
   // HANDLERS
@@ -1063,6 +1143,145 @@ const OptionsTrade: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Greeks Evolution Chart */}
+      {analysis && greeksEvolution.length > 0 && (
+        <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mt-6">
+          <h2 className="text-xl font-semibold mb-4 text-white">Greeks Evolution</h2>
+          <p className="text-sm text-gray-400 mb-4">
+            How position Greeks change as the underlying price moves. Shows sensitivity to spot price movement.
+          </p>
+          
+          <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={greeksEvolution}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis 
+                  dataKey="price"
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                  stroke="#94a3b8"
+                  tickFormatter={(val) => formatPrice(val)}
+                />
+                <YAxis 
+                  yAxisId="left"
+                  stroke="#94a3b8"
+                  label={{ value: 'Delta / Theta / Vega', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+                />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  stroke="#10b981"
+                  label={{ value: 'Gamma (×1000)', angle: 90, position: 'insideRight', fill: '#10b981' }}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #475569',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: number, name: string) => {
+                    if (name === 'Gamma') return [(value * 1000).toFixed(4), name];
+                    return [value.toFixed(name === 'Delta' ? 4 : 2), name];
+                  }}
+                  labelFormatter={(label) => `Spot: ${formatPrice(label)}`}
+                />
+                
+                {/* Current Spot Marker */}
+                {currentSpot && (
+                  <ReferenceLine 
+                    x={currentSpot} 
+                    stroke="#8b5cf6" 
+                    strokeWidth={2}
+                    strokeDasharray="3 3"
+                    label={{
+                      value: 'Current',
+                      position: 'top',
+                      fill: '#8b5cf6',
+                      fontSize: 11,
+                      fontWeight: 'bold'
+                    }}
+                  />
+                )}
+                
+                {/* Delta Line */}
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="delta"
+                  stroke="#06b6d4"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Delta"
+                />
+                
+                {/* Gamma Line (scaled x1000 for visibility) */}
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey={(data: GreeksEvolutionData) => data.gamma * 1000}
+                  stroke="#10b981"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Gamma"
+                />
+                
+                {/* Theta Line */}
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="theta"
+                  stroke="#ef4444"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Theta"
+                />
+                
+                {/* Vega Line (scaled /100 for better scale) */}
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey={(data: GreeksEvolutionData) => data.vega / 100}
+                  stroke="#8b5cf6"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Vega"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Legend */}
+          <div className="mt-4 flex items-center gap-6 text-sm text-gray-400">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-0.5 bg-cyan-400"></div>
+              <span><strong>Delta:</strong> Directional exposure</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-0.5 bg-green-500"></div>
+              <span><strong>Gamma (×1000):</strong> Delta acceleration</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-0.5 bg-red-500"></div>
+              <span><strong>Theta:</strong> Time decay per day</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-0.5 bg-purple-500"></div>
+              <span><strong>Vega (÷100):</strong> IV sensitivity</span>
+            </div>
+          </div>
+          
+          <div className="mt-4 p-4 bg-slate-900/50 rounded-lg border border-slate-700">
+            <p className="text-xs text-gray-400 leading-relaxed">
+              <strong className="text-gray-300">💡 How to read:</strong> 
+              <strong className="text-cyan-400"> Delta</strong> shows how much the position value changes per $1 move in spot. 
+              <strong className="text-green-400"> Gamma</strong> shows how fast Delta changes (highest ATM). 
+              <strong className="text-red-400"> Theta</strong> shows daily time decay (negative = losing value). 
+              <strong className="text-purple-400"> Vega</strong> shows sensitivity to volatility changes (highest ATM).
+            </p>
           </div>
         </div>
       )}
