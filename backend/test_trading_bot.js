@@ -56,28 +56,34 @@ const mockDatabase = {
     
     // Mock BotConfig model
     if (modelName === 'BotConfig') {
+      const mockConfig = {
+        id: 'test_config_1',
+        name: 'Test Config',
+        enabled: true,
+        strategy: 'iron_condor',
+        ivRankMin: 45,  // Changed from 50 to 45 so IV Rank 50 passes
+        ivRankMax: 100,
+        dteMin: 30,
+        dteMax: 45,
+        volumeMin: 100,
+        shortDelta: 0.16,
+        longDelta: 0.05,
+        profitTargetPct: 0.5,
+        stopLossPct: 2.0,
+        dteExit: 21,
+        deltaThreshold: 0.30,
+        maxPositions: 3,
+        maxRiskPerTrade: 1000
+      };
+      
       return {
         findByPk: async (id) => {
           console.log(`   [Mock] BotConfig.findByPk():`, id);
-          return {
-            id: id,
-            name: 'Test Config',
-            enabled: true,
-            strategy: 'iron_condor',
-            ivRankMin: 50,
-            ivRankMax: 100,
-            dteMin: 30,
-            dteMax: 45,
-            volumeMin: 100,
-            shortDelta: 0.16,
-            longDelta: 0.05,
-            profitTargetPct: 0.5,
-            stopLossPct: 2.0,
-            dteExit: 21,
-            deltaThreshold: 0.30,
-            maxPositions: 3,
-            maxRiskPerTrade: 1000
-          };
+          return mockConfig;
+        },
+        findOne: async (query) => {
+          console.log(`   [Mock] BotConfig.findOne():`, query.where);
+          return mockConfig;
         }
       };
     }
