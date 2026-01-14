@@ -1193,7 +1193,8 @@ const OptionsTrade: React.FC = () => {
                 {/* Current Spot Marker */}
                 {currentSpot && (
                   <ReferenceLine 
-                    x={currentSpot} 
+                    x={currentSpot}
+                    yAxisId="left"
                     stroke="#8b5cf6" 
                     strokeWidth={2}
                     strokeDasharray="3 3"
