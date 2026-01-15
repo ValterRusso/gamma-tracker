@@ -145,10 +145,10 @@ class PositionMonitor {
     const dte = this.calculateDTE(trade.legs[0].expiryDate);
     
     // 4. Check profit target
-    if (exitRules.profitTarget && pnlPercent >= exitRules.profitTarget * 100) {
+    if (exitRules.profitTarget && pnlPercent >= exitRules.profitTarget) {
       return {
         shouldExit: true,
-        reason: `profit_target (${pnlPercent.toFixed(1)}% >= ${exitRules.profitTarget * 100}%)`,
+        reason: `profit_target (${pnlPercent.toFixed(1)}% >= ${exitRules.profitTarget}%)`,
         currentPnL,
         pnlPercent,
         currentGreeks
@@ -156,10 +156,10 @@ class PositionMonitor {
     }
     
     // 5. Check stop loss
-    if (exitRules.stopLoss && pnlPercent <= -exitRules.stopLoss * 100) {
+    if (exitRules.stopLoss && pnlPercent <= -exitRules.stopLoss) {
       return {
         shouldExit: true,
-        reason: `stop_loss (${pnlPercent.toFixed(1)}% <= -${exitRules.stopLoss * 100}%)`,
+        reason: `stop_loss (${pnlPercent.toFixed(1)}% <= -${exitRules.stopLoss}%)`,
         currentPnL,
         pnlPercent,
         currentGreeks

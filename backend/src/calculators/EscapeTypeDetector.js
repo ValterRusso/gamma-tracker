@@ -21,7 +21,6 @@
 
 const EventEmitter = require('events');
 const IcebergDetector = require('./IcebergDetector');
-const { act } = require('react');
 
 class EscapeTypeDetector extends EventEmitter {
   constructor(dataCollector) {
