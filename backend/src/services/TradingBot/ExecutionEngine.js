@@ -71,7 +71,7 @@ class ExecutionEngine {
     }
     
     if (strategy === 'iron_butterfly') {
-      return this.buildIronButterfly(params, options);
+      return this.buildIronButterfly(options, spot, params);
     }
     
     // Add more strategies here
@@ -148,12 +148,15 @@ class ExecutionEngine {
    * Build Iron Butterfly legs
    * Sell ATM straddle + buy wings
    */
-  async buildIronButterfly(signal, options) {
-    const { spotPrice, expiration } = signal;
-    const { shortDelta, longDelta, wingWidth } = this.config;
+  buildIronButterfly(options, spot, params) {
+    const { wingWidth, dte } = params;
     
-    // Filter options for selected expiration
-    const validOptions = options.filter(opt => opt.expiryDate === expiration);
+    // Filter options by DTE
+    const targetDTE = (dte.min + dte.max) / 2;
+    const validOptions = options.filter(opt => {
+      const optDTE = this.calculateDTE(opt.expiryDate);
+      return optDTE >= dte.min && optDTE <= dte.max;
+    });
     
     if (validOptions.length === 0) {
       this.logger.warn('[ExecutionEngine] No options found for expiration');
