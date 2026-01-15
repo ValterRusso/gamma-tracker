@@ -26,6 +26,9 @@ const DEXSnapshotService = require('./database/services/DEXSnapshotService');
 // Data Collection
 const DataCollector = require('./collectors/DataCollector');
 
+// Services
+const OptionsService = require('./services/OptionsService');
+
 // Calculators
 const GEXCalculator = require('./calculators/GEXCalculator');
 const RegimeAnalyzer = require('./calculators/RegimeAnalyzer');
@@ -72,6 +75,9 @@ class GammaTracker {
     this.gexCalculator = null;
     this.regimeAnalyzer = null;
     this.apiServer = null;
+    
+    // Services
+    this.optionsService = null;
     
     // Database & Persistence
     this.database = null;
@@ -172,6 +178,10 @@ class GammaTracker {
       await this.dataCollector.start();
       
       this.logger.success('✓ Data collector iniciado');
+      
+      // Initialize OptionsService (depends on DataCollector)
+      this.optionsService = new OptionsService(this.dataCollector);
+      this.logger.success('✓ Options service inicializado');
 
       // ========================================
       // 4. IV COMPARISON
@@ -235,6 +245,9 @@ class GammaTracker {
         regimeAnalyzer: this.regimeAnalyzer,
         database: this.database,
         logger: this.logger,
+        
+        // Services
+        optionsService: this.optionsService,
         
         // Calculators
         volSurfaceCalculator: this.volSurfaceCalculator,
