@@ -92,7 +92,8 @@ class PositionMonitor {
    * Get current market data
    */
   async getCurrentMarketData() {
-    const options = await this.optionsService.getOptions();
+    const optionsData = await this.optionsService.getAllOptions();
+    const options = optionsData.options;
     const spot = await this.optionsService.getCurrentSpot();
     
     // Calculate IV Rank (simplified)
