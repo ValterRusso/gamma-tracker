@@ -85,6 +85,24 @@ module.exports = (sequelize) => {
       field: 'exit_cost',
       comment: 'Cost to close position'
     },
+    currentValue: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      field: 'current_value',
+      comment: 'Current value of the position (updated in real-time)'
+    },
+    unrealizedPnl: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      field: 'unrealized_pnl',
+      comment: 'Unrealized profit/loss (updated in real-time)'
+    },
+    currentPnlPercent: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+      field: 'current_pnl_percent',
+      comment: 'Current P&L as percentage (updated in real-time)'
+    },
     realizedPnl: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,

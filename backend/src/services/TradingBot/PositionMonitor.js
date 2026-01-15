@@ -39,6 +39,9 @@ class PositionMonitor {
       const exitActions = [];
       
       for (const trade of activeTrades) {
+        // Calculate and update P&L in real-time
+        await this.updatePositionPnL(trade, marketData);
+        
         const exitSignal = await this.checkExitConditions(trade, marketData);
         
         if (exitSignal.shouldExit) {
@@ -279,6 +282,36 @@ class PositionMonitor {
     const diffMs = expiry - now;
     const diffDays = diffMs / (1000 * 60 * 60 * 24);
     return Math.max(0, Math.floor(diffDays));
+  }
+
+  /**
+   * Update position P&L in real-time
+   */
+  async updatePositionPnL(trade, marketData) {
+    try {
+      const { options } = marketData;
+      
+      // Calculate current P&L
+      const currentPnL = await this.calculateCurrentPnL(trade, options);
+      const pnlPercent = (currentPnL / Math.abs(trade.maxLoss)) * 100;
+      
+      // Calculate current value (entry credit + current P&L)
+      const currentValue = (trade.entryCredit || 0) + currentPnL;
+      
+      // Update database
+      const BotTrade = this.db.getModel('BotTrade');
+      await BotTrade.update({
+        currentValue: currentValue.toFixed(2),
+        unrealizedPnl: currentPnL.toFixed(2),
+        currentPnlPercent: pnlPercent.toFixed(2)
+      }, {
+        where: { id: trade.id }
+      });
+      
+      this.logger.debug(`[PositionMonitor] Updated P&L for trade ${trade.id}: $${currentPnL.toFixed(2)} (${pnlPercent.toFixed(2)}%)`);
+    } catch (error) {
+      this.logger.error('[PositionMonitor] Error updating position P&L:', error);
+    }
   }
 
   /**
