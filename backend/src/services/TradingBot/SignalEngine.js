@@ -53,12 +53,12 @@ class SignalEngine {
    */
   async fetchMarketData() {
     // Fetch from your existing /api/options endpoint
-    const options = await this.optionsService.getOptions();
+    const optionsData = await this.optionsService.getAllOptions();
     const spotPrice = await this.optionsService.getCurrentSpot();
     
     return {
       spot: spotPrice,
-      options: options,
+      options: optionsData.options,
       timestamp: new Date()
     };
   }
