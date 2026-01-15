@@ -293,10 +293,19 @@ class PositionMonitor {
       
       // Calculate current P&L
       const currentPnL = await this.calculateCurrentPnL(trade, options);
-      const pnlPercent = (currentPnL / Math.abs(trade.maxLoss)) * 100;
+      
+      // Validate values before toFixed
+      if (currentPnL === null || currentPnL === undefined || isNaN(currentPnL)) {
+        this.logger.warn(`[PositionMonitor] Invalid P&L for trade ${trade.id}, skipping update`);
+        return;
+      }
+      
+      const maxLoss = Math.abs(trade.maxLoss || 1); // Avoid division by zero
+      const pnlPercent = (currentPnL / maxLoss) * 100;
       
       // Calculate current value (entry credit + current P&L)
-      const currentValue = (trade.entryCredit || 0) + currentPnL;
+      const entryCredit = parseFloat(trade.entryCredit) || 0;
+      const currentValue = entryCredit + currentPnL;
       
       // Update database
       const BotTrade = this.db.getModel('BotTrade');
