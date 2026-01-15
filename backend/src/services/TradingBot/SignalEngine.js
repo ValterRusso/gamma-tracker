@@ -301,6 +301,17 @@ class SignalEngine {
       };
     }
     
+    // For Iron Butterfly
+    if (entryRules.strategy === 'iron_butterfly') {
+      const { wingWidth } = entryRules;
+      
+      return {
+        dte: entryRules.dte || { min: 21, max: 35 },
+        wingWidth: wingWidth || 5000,
+        spot
+      };
+    }
+    
     return {};
   }
 
