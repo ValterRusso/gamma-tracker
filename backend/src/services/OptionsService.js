@@ -101,24 +101,16 @@ class OptionsService {
 
   /**
    * Get current spot price
-   * Extracts from the most recent option data
+   * Uses the real-time spot price from SpotPriceCollector (WebSocket)
    */
   async getCurrentSpot() {
-    const options = this.dataCollector.getAllOptions();
+    const spotPrice = this.dataCollector.getCurrentPrice();
     
-    if (!options || options.length === 0) {
-      throw new Error('No options data available to extract spot price');
+    if (!spotPrice || spotPrice === 0) {
+      throw new Error('Spot price not available. DataCollector may not be started yet.');
     }
     
-    // Get spot price from first option (they all have the same spot)
-    const firstOption = options[0];
-    const spot = firstOption.underlyingPrice || firstOption.spot || firstOption.spotPrice;
-    
-    if (!spot) {
-      throw new Error('Spot price not found in options data');
-    }
-    
-    return spot;
+    return spotPrice;
   }
 }
 
