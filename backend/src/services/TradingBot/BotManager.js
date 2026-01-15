@@ -81,7 +81,7 @@ class BotManager {
   async startBot(configId) {
     try {
       // Load configuration
-      const { BotConfig } = this.db;
+      const BotConfig = this.db.getModel('BotConfig');
       const config = await BotConfig.findByPk(configId);
       
       if (!config) {
