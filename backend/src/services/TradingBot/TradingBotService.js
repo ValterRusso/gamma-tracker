@@ -203,9 +203,12 @@ class TradingBotService {
   async canEnterNewPosition() {
     const BotTrade = this.db.getModel('BotTrade');
     
-    // Count active positions
+    // Count active positions for THIS bot only
     const activeCount = await BotTrade.count({
-      where: { status: 'active' }
+      where: { 
+        botId: this.botId,
+        status: 'active' 
+      }
     });
     
     // Check against max positions limit
