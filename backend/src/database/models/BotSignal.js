@@ -8,6 +8,12 @@ module.exports = (sequelize) => {
       primaryKey: true,
       comment: 'Unique signal identifier'
     },
+    botId: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      field: 'bot_id',
+      comment: 'Bot instance identifier (format: strategy_timestamp_random)'
+    },
     timestamp: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -59,6 +65,7 @@ module.exports = (sequelize) => {
     createdAt: 'created_at',
     updatedAt: false,
     indexes: [
+      { fields: ['bot_id'] },
       { fields: ['timestamp'] },
       { fields: ['signal_type'] },
       { fields: ['strategy'] },

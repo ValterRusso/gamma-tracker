@@ -5,12 +5,13 @@ const Logger = require('../../utils/logger');
  * Monitors active positions and checks exit conditions
  */
 class PositionMonitor {
-  constructor(config, database, optionsService, executionEngine) {
+  constructor(botId, config, database, optionsService, executionEngine) {
+    this.botId = botId;
     this.config = config;
     this.db = database;
     this.optionsService = optionsService;
     this.executionEngine = executionEngine;
-    this.logger = new Logger('PositionMonitor');
+    this.logger = new Logger(`PositionMonitor-${botId}`);
   }
 
   /**
@@ -79,7 +80,10 @@ class PositionMonitor {
     const BotTrade = this.db.getModel('BotTrade');
     
     return await BotTrade.findAll({
-      where: { status: 'active' },
+      where: { 
+        botId: this.botId,
+        status: 'active' 
+      },
       order: [['entryTime', 'ASC']]
     });
   }

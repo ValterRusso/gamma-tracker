@@ -8,6 +8,12 @@ module.exports = (sequelize) => {
       primaryKey: true,
       comment: 'Unique trade identifier'
     },
+    botId: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      field: 'bot_id',
+      comment: 'Bot instance identifier (format: strategy_timestamp_random)'
+    },
     strategy: {
       type: DataTypes.STRING(50),
       allowNull: false,
@@ -125,6 +131,7 @@ module.exports = (sequelize) => {
     createdAt: 'created_at',
     updatedAt: 'updated_at',
     indexes: [
+      { fields: ['bot_id'] },
       { fields: ['strategy'] },
       { fields: ['status'] },
       { fields: ['entry_time'] },

@@ -5,11 +5,12 @@ const Logger = require('../../utils/logger');
  * Analyzes market data and generates trading signals based on mathematical rules
  */
 class SignalEngine {
-  constructor(config, database, optionsService) {
+  constructor(botId, config, database, optionsService) {
+    this.botId = botId;
     this.config = config;
     this.db = database;
     this.optionsService = optionsService;
-    this.logger = new Logger('SignalEngine');
+    this.logger = new Logger(`SignalEngine-${botId}`);
   }
 
   /**
@@ -311,6 +312,7 @@ class SignalEngine {
       const BotSignal = this.db.getModel('BotSignal');
       
       await BotSignal.create({
+        botId: this.botId,
         timestamp: new Date(),
         signalType: signal.signalType,
         strategy: signal.strategy,

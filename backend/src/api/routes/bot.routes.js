@@ -1,37 +1,26 @@
 const express = require('express');
-const Logger = require('../../utils/logger');
-const logger = new Logger('BotRoutes');
-
-// Import TradingBotService
-const TradingBotService = require('../../services/TradingBot/TradingBotService');
-
-// Bot service instance (singleton)
-let botServiceInstance = null;
+const BotManager = require('../../services/TradingBot/BotManager');
 
 /**
- * Initialize bot service instance
+ * Bot Routes
+ * API endpoints for managing trading bot instances
  */
-function getBotService(database, optionsService) {
-  if (!botServiceInstance) {
-    botServiceInstance = new TradingBotService(database, optionsService);
-  }
-  return botServiceInstance;
-}
-
 module.exports = (dependencies) => {
   const router = express.Router();
   const { database, optionsService } = dependencies;
   
-  // Helper to get bot service
-  const getBot = () => getBotService(database, optionsService);
-
-  // ============================================
-  // BOT CONTROL ROUTES
-  // ============================================
-
+  // Initialize Bot Manager (singleton)
+  const botManager = new BotManager(database, optionsService);
+  
+  // ============================================================================
+  // BOT CONTROL ENDPOINTS
+  // ============================================================================
+  
   /**
+   * Start a new bot instance
    * POST /api/bot/start
-   * Start the trading bot with a specific configuration
+   * Body: { configId: string }
+   * Returns: { success, botId, message, config }
    */
   router.post('/bot/start', async (req, res) => {
     try {
@@ -44,129 +33,182 @@ module.exports = (dependencies) => {
         });
       }
       
-      const botService = getBot();
-      const result = await botService.start(configId);
+      const result = await botManager.startBot(configId);
       
-      logger.info(`[BotRoutes] Bot start requested: ${configId}`);
-      
-      res.json(result);
+      if (result.success) {
+        return res.json(result);
+      } else {
+        return res.status(400).json(result);
+      }
     } catch (error) {
-      logger.error('[BotRoutes] Error starting bot:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error starting bot:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
+  
   /**
-   * POST /api/bot/stop
-   * Stop the trading bot
+   * Stop a specific bot instance
+   * POST /api/bot/stop/:botId
+   * Returns: { success, message, botId }
    */
-  router.post('/bot/stop', async (req, res) => {
+  router.post('/bot/stop/:botId', async (req, res) => {
     try {
-      const botService = getBot();
-      const result = await botService.stop();
+      const { botId } = req.params;
       
-      logger.info('[BotRoutes] Bot stop requested');
+      const result = await botManager.stopBot(botId);
       
-      res.json(result);
+      if (result.success) {
+        return res.json(result);
+      } else {
+        return res.status(400).json(result);
+      }
     } catch (error) {
-      logger.error('[BotRoutes] Error stopping bot:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error stopping bot:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
+  
   /**
+   * Stop all running bots
+   * POST /api/bot/stop-all
+   * Returns: { success, stoppedCount, message }
+   */
+  router.post('/bot/stop-all', async (req, res) => {
+    try {
+      const result = await botManager.stopAll();
+      return res.json(result);
+    } catch (error) {
+      console.error('[BotRoutes] Error stopping all bots:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+  
+  // ============================================================================
+  // BOT STATUS ENDPOINTS
+  // ============================================================================
+  
+  /**
+   * Get status of all bots
    * GET /api/bot/status
-   * Get current bot status
+   * Returns: { success, data: { bots: [...], totalRunning: number } }
    */
   router.get('/bot/status', async (req, res) => {
     try {
-      const botService = getBot();
-      const status = botService.getStatus();
+      const bots = botManager.getStatus();
+      const totalRunning = botManager.getRunningCount();
       
-      res.json({
+      return res.json({
+        success: true,
+        data: {
+          bots,
+          totalRunning,
+          hasRunningBots: botManager.hasRunningBots()
+        }
+      });
+    } catch (error) {
+      console.error('[BotRoutes] Error getting status:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+  
+  /**
+   * Get status of a specific bot
+   * GET /api/bot/status/:botId
+   * Returns: { success, data: { botId, isRunning, config, uptime } }
+   */
+  router.get('/bot/status/:botId', async (req, res) => {
+    try {
+      const { botId } = req.params;
+      const status = botManager.getBotStatus(botId);
+      
+      if (!status) {
+        return res.status(404).json({
+          success: false,
+          error: `Bot not found: ${botId}`
+        });
+      }
+      
+      return res.json({
         success: true,
         data: status
       });
     } catch (error) {
-      logger.error('[BotRoutes] Error getting bot status:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error getting bot status:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
-  // ============================================
-  // BOT DATA ROUTES
-  // ============================================
-
+  
+  // ============================================================================
+  // BOT DATA ENDPOINTS
+  // ============================================================================
+  
   /**
-   * GET /api/bot/trades
-   * Get trades with optional filters
+   * Get trades (with optional filters)
+   * GET /api/bot/trades?botId=xxx&status=active&page=1&limit=50
+   * Returns: { success, data: { trades: [...], pagination: {...} } }
    */
   router.get('/bot/trades', async (req, res) => {
     try {
-      const {
-        status = 'all',
-        limit = 50,
-        offset = 0,
-        sortBy = 'entryTime',
-        sortOrder = 'DESC'
-      } = req.query;
-      
+      const { botId, status, page = 1, limit = 50 } = req.query;
       const BotTrade = database.getModel('BotTrade');
       
-      // Build query
       const where = {};
-      if (status !== 'all') {
-        where.status = status;
-      }
+      if (botId) where.botId = botId;
+      if (status) where.status = status;
       
-      const trades = await BotTrade.findAll({
+      const offset = (page - 1) * limit;
+      
+      const { count, rows } = await BotTrade.findAndCountAll({
         where,
+        order: [['entry_time', 'DESC']],
         limit: parseInt(limit),
-        offset: parseInt(offset),
-        order: [[sortBy, sortOrder]]
+        offset: parseInt(offset)
       });
       
-      // Get total count
-      const totalCount = await BotTrade.count({ where });
-      
-      res.json({
+      return res.json({
         success: true,
         data: {
-          trades,
+          trades: rows,
           pagination: {
-            total: totalCount,
+            total: count,
+            page: parseInt(page),
             limit: parseInt(limit),
-            offset: parseInt(offset),
-            hasMore: totalCount > parseInt(offset) + parseInt(limit)
+            totalPages: Math.ceil(count / limit)
           }
         }
       });
     } catch (error) {
-      logger.error('[BotRoutes] Error getting trades:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error getting trades:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
+  
   /**
+   * Get a specific trade
    * GET /api/bot/trades/:id
-   * Get trade details by ID
+   * Returns: { success, data: { trade } }
    */
   router.get('/bot/trades/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      
       const BotTrade = database.getModel('BotTrade');
       
       const trade = await BotTrade.findByPk(id);
@@ -178,200 +220,201 @@ module.exports = (dependencies) => {
         });
       }
       
-      res.json({
+      return res.json({
         success: true,
         data: trade
       });
     } catch (error) {
-      logger.error('[BotRoutes] Error getting trade:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error getting trade:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
+  
   /**
-   * GET /api/bot/signals
-   * Get signal history
+   * Get signals (with optional filters)
+   * GET /api/bot/signals?botId=xxx&signalType=entry&page=1&limit=50
+   * Returns: { success, data: { signals: [...], pagination: {...} } }
    */
   router.get('/bot/signals', async (req, res) => {
     try {
-      const {
-        signalType = 'all',
-        limit = 100,
-        offset = 0
-      } = req.query;
-      
+      const { botId, signalType, page = 1, limit = 50 } = req.query;
       const BotSignal = database.getModel('BotSignal');
       
-      // Build query
       const where = {};
-      if (signalType !== 'all') {
-        where.signalType = signalType;
-      }
+      if (botId) where.botId = botId;
+      if (signalType) where.signalType = signalType;
       
-      const signals = await BotSignal.findAll({
+      const offset = (page - 1) * limit;
+      
+      const { count, rows } = await BotSignal.findAndCountAll({
         where,
+        order: [['timestamp', 'DESC']],
         limit: parseInt(limit),
-        offset: parseInt(offset),
-        order: [['timestamp', 'DESC']]
+        offset: parseInt(offset)
       });
       
-      const totalCount = await BotSignal.count({ where });
-      
-      res.json({
+      return res.json({
         success: true,
         data: {
-          signals,
+          signals: rows,
           pagination: {
-            total: totalCount,
+            total: count,
+            page: parseInt(page),
             limit: parseInt(limit),
-            offset: parseInt(offset),
-            hasMore: totalCount > parseInt(offset) + parseInt(limit)
+            totalPages: Math.ceil(count / limit)
           }
         }
       });
     } catch (error) {
-      logger.error('[BotRoutes] Error getting signals:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error getting signals:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
+  
   /**
-   * GET /api/bot/performance
-   * Get bot performance metrics
+   * Get performance metrics
+   * GET /api/bot/performance?botId=xxx&period=all_time
+   * Returns: { success, data: { metrics } }
    */
   router.get('/bot/performance', async (req, res) => {
     try {
-      const { period = 'all' } = req.query;
-      
+      const { botId, period = 'all_time' } = req.query;
       const BotTrade = database.getModel('BotTrade');
       
-      // Calculate date filter
-      let dateFilter = {};
-      if (period !== 'all') {
-        const now = new Date();
-        const startDate = new Date();
-        
-        switch (period) {
-          case 'day':
-            startDate.setDate(now.getDate() - 1);
-            break;
-          case 'week':
-            startDate.setDate(now.getDate() - 7);
-            break;
-          case 'month':
-            startDate.setMonth(now.getMonth() - 1);
-            break;
-        }
-        
-        dateFilter = {
-          entryTime: {
-            [require('sequelize').Op.gte]: startDate
+      const where = { status: 'closed' };
+      if (botId) where.botId = botId;
+      
+      const trades = await BotTrade.findAll({ where });
+      
+      if (trades.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            totalTrades: 0,
+            winRate: '0.00%',
+            totalPnl: '0.00',
+            avgPnlPerTrade: '0.00',
+            avgWinningTrade: '0.00',
+            avgLosingTrade: '0.00',
+            largestWin: '0.00',
+            largestLoss: '0.00',
+            maxDrawdown: '0.00',
+            profitFactor: '0.00',
+            sharpeRatio: '0.00',
+            avgDaysInTrade: '0.00'
           }
-        };
+        });
       }
       
-      // Get all closed trades in period
-      const closedTrades = await BotTrade.findAll({
-        where: {
-          status: 'closed',
-          ...dateFilter
-        }
-      });
-      
-      // Get active trades
-      const activeTrades = await BotTrade.findAll({
-        where: { status: 'active' }
-      });
-      
       // Calculate metrics
-      const totalTrades = closedTrades.length;
-      const winningTrades = closedTrades.filter(t => t.realizedPnl > 0).length;
-      const losingTrades = closedTrades.filter(t => t.realizedPnl < 0).length;
-      const winRate = totalTrades > 0 ? winningTrades / totalTrades : 0;
+      const totalTrades = trades.length;
+      const winningTrades = trades.filter(t => t.realizedPnl > 0);
+      const losingTrades = trades.filter(t => t.realizedPnl <= 0);
       
-      const totalPnl = closedTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0);
-      const avgPnl = totalTrades > 0 ? totalPnl / totalTrades : 0;
+      const winRate = (winningTrades.length / totalTrades) * 100;
+      const totalPnl = trades.reduce((sum, t) => sum + parseFloat(t.realizedPnl || 0), 0);
+      const avgPnlPerTrade = totalPnl / totalTrades;
       
-      const avgWin = winningTrades > 0
-        ? closedTrades.filter(t => t.realizedPnl > 0).reduce((sum, t) => sum + t.realizedPnl, 0) / winningTrades
+      const avgWinningTrade = winningTrades.length > 0
+        ? winningTrades.reduce((sum, t) => sum + parseFloat(t.realizedPnl), 0) / winningTrades.length
         : 0;
       
-      const avgLoss = losingTrades > 0
-        ? closedTrades.filter(t => t.realizedPnl < 0).reduce((sum, t) => sum + t.realizedPnl, 0) / losingTrades
+      const avgLosingTrade = losingTrades.length > 0
+        ? losingTrades.reduce((sum, t) => sum + parseFloat(t.realizedPnl), 0) / losingTrades.length
         : 0;
       
-      const profitFactor = Math.abs(avgLoss) > 0 ? avgWin / Math.abs(avgLoss) : 0;
+      const largestWin = winningTrades.length > 0
+        ? Math.max(...winningTrades.map(t => parseFloat(t.realizedPnl)))
+        : 0;
       
-      // Calculate max drawdown
-      let runningPnl = 0;
+      const largestLoss = losingTrades.length > 0
+        ? Math.min(...losingTrades.map(t => parseFloat(t.realizedPnl)))
+        : 0;
+      
+      // Calculate profit factor
+      const grossProfit = winningTrades.reduce((sum, t) => sum + parseFloat(t.realizedPnl), 0);
+      const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + parseFloat(t.realizedPnl), 0));
+      const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : 0;
+      
+      // Calculate Sharpe ratio (simplified)
+      const returns = trades.map(t => parseFloat(t.realizedPnl || 0));
+      const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+      const stdDev = Math.sqrt(
+        returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length
+      );
+      const sharpeRatio = stdDev > 0 ? avgReturn / stdDev : 0;
+      
+      // Calculate avg days in trade
+      const daysInTrade = trades
+        .filter(t => t.entryTime && t.exitTime)
+        .map(t => {
+          const entry = new Date(t.entryTime);
+          const exit = new Date(t.exitTime);
+          return (exit - entry) / (1000 * 60 * 60 * 24);
+        });
+      
+      const avgDaysInTrade = daysInTrade.length > 0
+        ? daysInTrade.reduce((sum, d) => sum + d, 0) / daysInTrade.length
+        : 0;
+      
+      // Calculate max drawdown (simplified)
       let peak = 0;
       let maxDrawdown = 0;
+      let cumPnl = 0;
       
-      for (const trade of closedTrades) {
-        runningPnl += trade.realizedPnl || 0;
-        if (runningPnl > peak) {
-          peak = runningPnl;
+      for (const trade of trades) {
+        cumPnl += parseFloat(trade.realizedPnl || 0);
+        if (cumPnl > peak) {
+          peak = cumPnl;
         }
-        const drawdown = peak - runningPnl;
+        const drawdown = peak - cumPnl;
         if (drawdown > maxDrawdown) {
           maxDrawdown = drawdown;
         }
       }
       
-      // Calculate Sharpe ratio (simplified)
-      const returns = closedTrades.map(t => t.pnlPercent || 0);
-      const avgReturn = returns.length > 0
-        ? returns.reduce((sum, r) => sum + r, 0) / returns.length
-        : 0;
-      
-      const variance = returns.length > 0
-        ? returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length
-        : 0;
-      
-      const stdDev = Math.sqrt(variance);
-      const sharpeRatio = stdDev > 0 ? avgReturn / stdDev : 0;
-      
-      res.json({
+      return res.json({
         success: true,
         data: {
-          period,
           totalTrades,
-          activeTrades: activeTrades.length,
-          closedTrades: closedTrades.length,
-          winningTrades,
-          losingTrades,
-          winRate: (winRate * 100).toFixed(2) + '%',
+          winningTrades: winningTrades.length,
+          losingTrades: losingTrades.length,
+          winRate: winRate.toFixed(2) + '%',
           totalPnl: totalPnl.toFixed(2),
-          avgPnl: avgPnl.toFixed(2),
-          avgWin: avgWin.toFixed(2),
-          avgLoss: avgLoss.toFixed(2),
-          profitFactor: profitFactor.toFixed(2),
+          avgPnlPerTrade: avgPnlPerTrade.toFixed(2),
+          avgWinningTrade: avgWinningTrade.toFixed(2),
+          avgLosingTrade: avgLosingTrade.toFixed(2),
+          largestWin: largestWin.toFixed(2),
+          largestLoss: largestLoss.toFixed(2),
           maxDrawdown: maxDrawdown.toFixed(2),
-          sharpeRatio: sharpeRatio.toFixed(2)
+          profitFactor: profitFactor.toFixed(2),
+          sharpeRatio: sharpeRatio.toFixed(2),
+          avgDaysInTrade: avgDaysInTrade.toFixed(2)
         }
       });
     } catch (error) {
-      logger.error('[BotRoutes] Error getting performance:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error getting performance:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
-  // ============================================
-  // BOT CONFIG ROUTES
-  // ============================================
-
+  
+  // ============================================================================
+  // BOT CONFIG ENDPOINTS
+  // ============================================================================
+  
   /**
-   * GET /api/bot/configs
    * Get all bot configurations
+   * GET /api/bot/configs
+   * Returns: { success, data: [...] }
    */
   router.get('/bot/configs', async (req, res) => {
     try {
@@ -381,27 +424,27 @@ module.exports = (dependencies) => {
         order: [['created_at', 'DESC']]
       });
       
-      res.json({
+      return res.json({
         success: true,
         data: configs
       });
     } catch (error) {
-      logger.error('[BotRoutes] Error getting configs:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error getting configs:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
+  
   /**
+   * Get a specific bot configuration
    * GET /api/bot/configs/:id
-   * Get config by ID
+   * Returns: { success, data: {...} }
    */
   router.get('/bot/configs/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      
       const BotConfig = database.getModel('BotConfig');
       
       const config = await BotConfig.findByPk(id);
@@ -409,64 +452,70 @@ module.exports = (dependencies) => {
       if (!config) {
         return res.status(404).json({
           success: false,
-          error: 'Config not found'
+          error: 'Configuration not found'
         });
       }
       
-      res.json({
+      return res.json({
         success: true,
         data: config
       });
     } catch (error) {
-      logger.error('[BotRoutes] Error getting config:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error getting config:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
+  
   /**
+   * Create a new bot configuration
    * POST /api/bot/configs
-   * Create new bot configuration
+   * Body: { name, strategy, symbol, entryRules, exitRules, riskParams }
+   * Returns: { success, data: {...} }
    */
   router.post('/bot/configs', async (req, res) => {
     try {
-      const configData = req.body;
+      const { name, strategy, symbol, entryRules, exitRules, riskParams } = req.body;
       
-      // Validate required fields
-      const requiredFields = ['name', 'strategy'];
-      for (const field of requiredFields) {
-        if (!configData[field]) {
-          return res.status(400).json({
-            success: false,
-            error: `${field} is required`
-          });
-        }
+      if (!name || !strategy || !symbol) {
+        return res.status(400).json({
+          success: false,
+          error: 'name, strategy, and symbol are required'
+        });
       }
       
       const BotConfig = database.getModel('BotConfig');
       
-      const config = await BotConfig.create(configData);
+      const config = await BotConfig.create({
+        name,
+        strategy,
+        symbol,
+        enabled: false, // Start disabled by default
+        entryRules: entryRules || {},
+        exitRules: exitRules || {},
+        riskParams: riskParams || {}
+      });
       
-      logger.info(`[BotRoutes] Config created: ${config.id}`);
-      
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: config
       });
     } catch (error) {
-      logger.error('[BotRoutes] Error creating config:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error creating config:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
+  
   /**
+   * Update a bot configuration
    * PUT /api/bot/configs/:id
-   * Update bot configuration
+   * Body: { name?, strategy?, symbol?, entryRules?, exitRules?, riskParams?, enabled? }
+   * Returns: { success, data: {...} }
    */
   router.put('/bot/configs/:id', async (req, res) => {
     try {
@@ -474,79 +523,85 @@ module.exports = (dependencies) => {
       const updates = req.body;
       
       const BotConfig = database.getModel('BotConfig');
-      
       const config = await BotConfig.findByPk(id);
       
       if (!config) {
         return res.status(404).json({
           success: false,
-          error: 'Config not found'
+          error: 'Configuration not found'
+        });
+      }
+      
+      // Check if config is in use by any running bot
+      const bots = botManager.getAllBots();
+      const inUse = bots.some(bot => bot.config && bot.config.id === id && bot.isRunning);
+      
+      if (inUse) {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot update configuration while it is in use by a running bot'
         });
       }
       
       await config.update(updates);
       
-      logger.info(`[BotRoutes] Config updated: ${id}`);
-      
-      res.json({
+      return res.json({
         success: true,
         data: config
       });
     } catch (error) {
-      logger.error('[BotRoutes] Error updating config:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error updating config:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
+  
   /**
+   * Delete a bot configuration
    * DELETE /api/bot/configs/:id
-   * Delete bot configuration
+   * Returns: { success, message }
    */
   router.delete('/bot/configs/:id', async (req, res) => {
     try {
       const { id } = req.params;
       
       const BotConfig = database.getModel('BotConfig');
-      
       const config = await BotConfig.findByPk(id);
       
       if (!config) {
         return res.status(404).json({
           success: false,
-          error: 'Config not found'
+          error: 'Configuration not found'
         });
       }
       
-      // Check if config is currently in use
-      const botService = getBot();
-      const status = botService.getStatus();
+      // Check if config is in use by any running bot
+      const bots = botManager.getAllBots();
+      const inUse = bots.some(bot => bot.config && bot.config.id === id && bot.isRunning);
       
-      if (status.isRunning && status.config?.id === id) {
+      if (inUse) {
         return res.status(400).json({
           success: false,
-          error: 'Cannot delete config that is currently in use. Stop the bot first.'
+          error: 'Cannot delete configuration while it is in use by a running bot'
         });
       }
       
       await config.destroy();
       
-      logger.info(`[BotRoutes] Config deleted: ${id}`);
-      
-      res.json({
+      return res.json({
         success: true,
-        message: 'Config deleted successfully'
+        message: 'Configuration deleted successfully'
       });
     } catch (error) {
-      logger.error('[BotRoutes] Error deleting config:', error);
-      res.status(500).json({
+      console.error('[BotRoutes] Error deleting config:', error);
+      return res.status(500).json({
         success: false,
         error: error.message
       });
     }
   });
-
+  
   return router;
 };

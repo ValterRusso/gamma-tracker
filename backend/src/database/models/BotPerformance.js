@@ -8,6 +8,12 @@ module.exports = (sequelize) => {
       primaryKey: true,
       comment: 'Unique performance record identifier'
     },
+    botId: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      field: 'bot_id',
+      comment: 'Bot instance identifier (null for aggregated metrics)'
+    },
     period: {
       type: DataTypes.ENUM('daily', 'weekly', 'monthly', 'all_time'),
       allowNull: false,
@@ -120,6 +126,7 @@ module.exports = (sequelize) => {
     createdAt: 'created_at',
     updatedAt: 'updated_at',
     indexes: [
+      { fields: ['bot_id'] },
       { fields: ['period'] },
       { fields: ['strategy'] },
       { fields: ['period_start', 'period_end'] },

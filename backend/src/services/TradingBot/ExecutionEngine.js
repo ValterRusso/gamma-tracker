@@ -5,11 +5,12 @@ const Logger = require('../../utils/logger');
  * Simulates order execution with realistic slippage and fills
  */
 class ExecutionEngine {
-  constructor(config, database, optionsService) {
+  constructor(botId, config, database, optionsService) {
+    this.botId = botId;
     this.config = config;
     this.db = database;
     this.optionsService = optionsService;
-    this.logger = new Logger('ExecutionEngine');
+    this.logger = new Logger(`ExecutionEngine-${botId}`);
   }
 
   /**
@@ -374,6 +375,7 @@ class ExecutionEngine {
     const BotTrade = this.db.getModel('BotTrade');
     
     const trade = await BotTrade.create({
+      botId: this.botId,
       strategy,
       status: 'active',
       entryTime: new Date(),
@@ -384,7 +386,7 @@ class ExecutionEngine {
       entryCredit: metrics.netCredit,
       legs: legs,
       entryGreeks: greeks,
-      notes: `Auto-entered by bot. Strategy: ${this.config.strategy}`
+      notes: `Auto-entered by bot ${this.botId}. Strategy: ${this.config.strategy}`
     });
     
     return trade;

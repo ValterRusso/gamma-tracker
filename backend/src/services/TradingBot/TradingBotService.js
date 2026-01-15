@@ -8,10 +8,11 @@ const PositionMonitor = require('./PositionMonitor');
  * Main orchestrator for automated trading system
  */
 class TradingBotService {
-  constructor(database, optionsService) {
+  constructor(botId, database, optionsService) {
+    this.botId = botId;
     this.db = database;
     this.optionsService = optionsService;
-    this.logger = new Logger('TradingBotService');
+    this.logger = new Logger(`TradingBot-${botId}`);
     
     // Engines will be initialized when bot starts (need config first)
     this.signalEngine = null;
@@ -22,6 +23,7 @@ class TradingBotService {
     this.isRunning = false;
     this.intervalId = null;
     this.config = null;
+    this.startTime = null;
   }
 
   /**
@@ -48,13 +50,14 @@ class TradingBotService {
       
       this.logger.info(`[TradingBot] Starting bot with config: ${this.config.name}`);
       
-      // Initialize engines with config
-      this.signalEngine = new SignalEngine(this.config, this.db, this.optionsService);
-      this.executionEngine = new ExecutionEngine(this.config, this.db, this.optionsService);
-      this.positionMonitor = new PositionMonitor(this.config, this.db, this.optionsService, this.executionEngine);
+      // Initialize engines with config and botId
+      this.signalEngine = new SignalEngine(this.botId, this.config, this.db, this.optionsService);
+      this.executionEngine = new ExecutionEngine(this.botId, this.config, this.db, this.optionsService);
+      this.positionMonitor = new PositionMonitor(this.botId, this.config, this.db, this.optionsService, this.executionEngine);
       
       // Set running state
       this.isRunning = true;
+      this.startTime = new Date();
       
       // Run initial iteration
       await this.runIteration();
@@ -125,8 +128,28 @@ class TradingBotService {
         name: this.config.name,
         strategy: this.config.strategy
       } : null,
-      uptime: this.isRunning ? 'Running' : 'Stopped'
+      uptime: this.getUptime()
     };
+  }
+
+  /**
+   * Get bot uptime
+   * @returns {string} Formatted uptime string
+   */
+  getUptime() {
+    if (!this.isRunning || !this.startTime) {
+      return 'Stopped';
+    }
+    
+    const now = new Date();
+    const uptimeMs = now - this.startTime;
+    const uptimeSec = Math.floor(uptimeMs / 1000);
+    
+    const hours = Math.floor(uptimeSec / 3600);
+    const minutes = Math.floor((uptimeSec % 3600) / 60);
+    const seconds = uptimeSec % 60;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
 
   /**
