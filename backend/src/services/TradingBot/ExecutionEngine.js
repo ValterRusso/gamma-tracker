@@ -63,7 +63,8 @@ class ExecutionEngine {
    */
   async buildStrategyLegs(strategy, params, marketData) {
     const { spot } = marketData;
-    const options = await this.optionsService.getOptions();
+    const optionsData = await this.optionsService.getAllOptions();
+    const options = optionsData.options;
     
     if (strategy === 'iron_condor') {
       return this.buildIronCondor(options, spot, params);
@@ -450,7 +451,8 @@ class ExecutionEngine {
    * Get current prices for all legs
    */
   async getCurrentLegPrices(legs) {
-    const options = await this.optionsService.getOptions();
+    const optionsData = await this.optionsService.getAllOptions();
+    const options = optionsData.options;
     
     return legs.map(leg => {
       // Find matching option in current data
