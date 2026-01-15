@@ -110,7 +110,7 @@ module.exports = (sequelize) => {
       comment: 'Realized profit/loss'
     },
     pnlPercent: {
-      type: DataTypes.DECIMAL(5, 2),
+      type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
       field: 'pnl_percent',
       comment: 'P&L as percentage of max risk'
