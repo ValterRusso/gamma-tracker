@@ -10,6 +10,7 @@
 const StrategyFactory = require('./src/services/TradingBot/strategies/StrategyFactory');
 const DataCollector = require('./src/collectors/DataCollector');
 const OptionsService = require('./src/services/OptionsService');
+const axios = require('axios');
 
 /**
  * Initialize DataCollector and OptionsService
@@ -39,9 +40,22 @@ async function fetchRealMarketData(optionsService) {
   try {
     console.log('📊 Fetching real market data...');
     
-    // Get spot price
-    const spot = await optionsService.getCurrentSpot();
-    console.log(`   Spot Price: $${spot.toFixed(2)}`);
+    // Get spot price from /api/binance/stats endpoint
+    let spot;
+    try {
+      const statsResponse = await axios.get('http://localhost:3300/api/binance/stats');
+      if (statsResponse.data.success && statsResponse.data.data.spotPrice) {
+        spot = statsResponse.data.data.spotPrice;
+        console.log(`   Spot Price: $${spot.toFixed(2)} (from /api/binance/stats)`);
+      } else {
+        throw new Error('Spot price not in stats response');
+      }
+    } catch (error) {
+      console.warn(`   ⚠️  Could not fetch spot from /api/binance/stats: ${error.message}`);
+      console.log('   Trying optionsService.getCurrentSpot()...');
+      spot = await optionsService.getCurrentSpot();
+      console.log(`   Spot Price: $${spot.toFixed(2)} (from DataCollector)`);
+    }
     
     // Get all options
     const optionsResult = await optionsService.getAllOptions();
