@@ -15,7 +15,7 @@ class RiskManager {
       maxGamma: 0.001,
       minTheta: -100,
       maxVega: 500,
-      maxLossPerTrade: 1000,
+      maxLossPerTrade: 10000,
       minRiskReward: 0.3,
       maxDrawdown: 0.2,
       maxPortfolioRisk: 0.1
