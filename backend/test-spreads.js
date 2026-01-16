@@ -294,9 +294,15 @@ async function testStrategy(strategyName, config, marketData, indicators) {
 
     if (signal.position) {
       console.log(`\n   📦 Position Details:`);
-      console.log(`      Contracts: ${signal.position.contracts}`);
-      console.log(`      Total Risk: $${signal.position.totalRisk.toFixed(2)}`);
-      console.log(`      Risk %: ${signal.position.riskPercent.toFixed(2)}%`);
+      if (signal.position.contracts !== undefined) {
+        console.log(`      Contracts: ${signal.position.contracts}`);
+      }
+      if (signal.position.totalRisk !== undefined) {
+        console.log(`      Total Risk: $${signal.position.totalRisk.toFixed(2)}`);
+      }
+      if (signal.position.riskPercent !== undefined) {
+        console.log(`      Risk %: ${signal.position.riskPercent.toFixed(2)}%`);
+      }
     }
 
     console.log('\n✅ TEST COMPLETED SUCCESSFULLY\n');
