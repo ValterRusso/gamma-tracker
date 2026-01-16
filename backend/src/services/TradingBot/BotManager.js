@@ -25,6 +25,54 @@ class BotManager {
   }
 
   /**
+   * Initialize bot manager on startup
+   * Auto-restarts bots that were enabled before backend restart
+   */
+  async initialize() {
+    try {
+      this.logger.info('[BotManager] Checking for bots to auto-restart...');
+      
+      // Find all enabled configurations
+      const BotConfig = this.db.getModel('BotConfig');
+      const enabledConfigs = await BotConfig.findAll({
+        where: { enabled: true }
+      });
+      
+      if (enabledConfigs.length === 0) {
+        this.logger.info('[BotManager] No enabled bot configs found');
+        return;
+      }
+      
+      this.logger.info(`[BotManager] Found ${enabledConfigs.length} enabled config(s), attempting to restart...`);
+      
+      // Restart each enabled bot
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (const config of enabledConfigs) {
+        try {
+          const result = await this.startBot(config.id);
+          if (result.success) {
+            this.logger.info(`[BotManager] ✅ Auto-restarted: ${config.name} (${result.botId})`);
+            successCount++;
+          } else {
+            this.logger.warn(`[BotManager] ⚠️  Failed to auto-restart: ${config.name}`);
+            failCount++;
+          }
+        } catch (error) {
+          this.logger.error(`[BotManager] ❌ Error auto-restarting ${config.name}: ${error.message}`);
+          failCount++;
+        }
+      }
+      
+      this.logger.info(`[BotManager] Auto-restart complete: ${successCount} success, ${failCount} failed`);
+      
+    } catch (error) {
+      this.logger.error(`[BotManager] Error during initialization: ${error.message}`);
+    }
+  }
+
+  /**
    * Generate unique bot ID
    * Format: {strategy}_{timestamp}_{random}
    * Example: iron_condor_1705267200_a3f9

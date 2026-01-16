@@ -12,6 +12,11 @@ module.exports = (dependencies) => {
   // Initialize Bot Manager (singleton)
   const botManager = new BotManager(database, optionsService);
   
+  // Auto-restart enabled bots on backend startup
+  botManager.initialize().catch(error => {
+    console.error('[BotRoutes] Failed to auto-restart bots:', error);
+  });
+  
   // ============================================================================
   // BOT CONTROL ENDPOINTS
   // ============================================================================
