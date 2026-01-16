@@ -331,7 +331,7 @@ class BaseStrategy {
     const checks = {
       ivRankValid: this.params.minIVRank >= 0 && this.params.maxIVRank <= 100,
       dteValid: this.params.minDTE > 0 && this.params.maxDTE > this.params.minDTE,
-      riskValid: this.params.riskPercent > 0 && this.params.riskPercent <= 10,
+      riskValid: this.params.riskPercent > 0 && this.params.riskPercent <= 50,
       profitTargetValid: this.params.profitTarget > 0 && this.params.profitTarget <= 1,
       stopLossValid: this.params.stopLoss > 0
     };
