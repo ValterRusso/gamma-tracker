@@ -22,14 +22,19 @@ class ExecutionEngine {
     try {
       this.logger.info(`[ExecutionEngine] Executing entry for ${signal.strategy}`);
       
-      const { strategy, params, marketData } = signal;
+      const { strategy, legs: signalLegs, marketData } = signal;
       
-      // 1. Build option legs based on strategy
-      const legs = await this.buildStrategyLegs(strategy, params, marketData);
-      
-      if (!legs || legs.length === 0) {
-        throw new Error('Failed to build strategy legs');
+      // 1. Use legs from signal (already selected by strategy)
+      if (!signalLegs || signalLegs.length === 0) {
+        throw new Error('Signal has no legs');
       }
+      
+      // Convert signal legs format to execution format
+      const legs = signalLegs.map(leg => ({
+        ...leg.option,
+        action: leg.action.toLowerCase(), // 'BUY' -> 'buy'
+        quantity: leg.quantity || 1
+      }));
       
       // 2. Simulate order execution with slippage
       const executedLegs = await this.simulateExecution(legs);
