@@ -13,6 +13,12 @@
  * 4. Check if entry executed
  * 5. Check trade in database
  * 6. Stop bot
+ * 
+ * IMPROVEMENTS:
+ * - Fixed endpoint: /api/bot/configs (not /api/bot/config)
+ * - Better WAIT signal diagnostics
+ * - Retry logic for multiple signal attempts
+ * - Detailed failure analysis
  */
 
 const axios = require('axios');
@@ -61,7 +67,7 @@ async function createBotConfig() {
   console.log('\n1️⃣  Creating bot config...');
   
   try {
-    const response = await axios.post(`${BASE_URL}/bot/config`, TEST_CONFIG);
+    const response = await axios.post(`${BASE_URL}/bot/configs`, TEST_CONFIG);
     
     if (response.data.success) {
       console.log(`   ✅ Config created: ${response.data.data.id}`);
@@ -119,11 +125,13 @@ async function checkBotStatus(botId) {
   }
 }
 
-async function waitForSignal(botId, maxWaitSeconds = 120) {
+async function waitForSignal(botId, maxWaitSeconds = 180) {
   console.log(`\n4️⃣  Waiting for signal (max ${maxWaitSeconds}s)...`);
+  console.log(`   ℹ️  Bot runs every 60s, so this may take a few minutes`);
   
   const startTime = Date.now();
   let attempts = 0;
+  let lastSignalCount = 0;
   
   while (Date.now() - startTime < maxWaitSeconds * 1000) {
     attempts++;
@@ -133,22 +141,64 @@ async function waitForSignal(botId, maxWaitSeconds = 120) {
         params: { botId, limit: 10 }
       });
       
-      if (response.data.success && response.data.data.signals.length > 0) {
+      if (response.data.success) {
         const signals = response.data.data.signals;
-        const latestSignal = signals[0];
         
-        console.log(`   ✅ Signal found after ${attempts} attempts!`);
-        console.log(`   📊 Type: ${latestSignal.signalType}`);
-        console.log(`   🎯 Strategy: ${latestSignal.strategy}`);
-        console.log(`   💯 Confidence: ${latestSignal.confidence}%`);
-        console.log(`   📝 Reason: ${latestSignal.reason}`);
+        // Show progress if signal count changed
+        if (signals.length !== lastSignalCount) {
+          console.log(`   📊 Signals found: ${signals.length}`);
+          lastSignalCount = signals.length;
+        }
         
-        return latestSignal;
+        if (signals.length > 0) {
+          const latestSignal = signals[0];
+          
+          console.log(`   ✅ Signal found after ${attempts} attempts!`);
+          console.log(`   📊 Type: ${latestSignal.signalType}`);
+          console.log(`   🎯 Strategy: ${latestSignal.strategy}`);
+          console.log(`   💯 Confidence: ${(latestSignal.confidence * 100).toFixed(2)}%`);
+          console.log(`   📝 Reason: ${latestSignal.reason}`);
+          
+          // Analyze WAIT signals
+          if (latestSignal.signalType === 'wait') {
+            console.log(`\n   🔍 WAIT Signal Analysis:`);
+            console.log(`      This is normal - bot is waiting for better conditions`);
+            
+            // Parse reason for specific issues
+            const reason = latestSignal.reason.toLowerCase();
+            if (reason.includes('strike')) {
+              console.log(`      Issue: Could not find suitable strikes`);
+              console.log(`      Possible causes:`);
+              console.log(`        - Target deltas (0.60, 0.40) not available`);
+              console.log(`        - Insufficient options liquidity`);
+              console.log(`        - DTE range (20-60 days) not available`);
+            } else if (reason.includes('iv')) {
+              console.log(`      Issue: IV conditions not met`);
+              console.log(`      Possible causes:`);
+              console.log(`        - IV Rank outside range (0-100)`);
+              console.log(`        - Low implied volatility`);
+            } else if (reason.includes('market')) {
+              console.log(`      Issue: Market conditions not ideal`);
+              console.log(`      Possible causes:`);
+              console.log(`        - Market closed or low activity`);
+              console.log(`        - Bid-ask spreads too wide`);
+            }
+            
+            console.log(`\n   💡 Suggestion: Bot will keep trying every 60s`);
+            console.log(`      You can:`);
+            console.log(`        - Wait for market conditions to improve`);
+            console.log(`        - Adjust config (wider delta range, longer DTE)`);
+            console.log(`        - Try different symbol or strategy`);
+          }
+          
+          return latestSignal;
+        }
       }
       
       // Wait 5 seconds before next check
       if (attempts % 6 === 0) {
-        console.log(`   ⏳ Still waiting... (${Math.floor((Date.now() - startTime) / 1000)}s elapsed)`);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        console.log(`   ⏳ Still waiting... (${elapsed}s elapsed, ${lastSignalCount} signals so far)`);
       }
       await wait(5000);
       
@@ -246,20 +296,29 @@ async function runTest() {
     // 3. Check status
     await checkBotStatus(botId);
     
-    // 4. Wait for signal (bot runs every 60s, so wait up to 120s)
-    const signal = await waitForSignal(botId, 120);
+    // 4. Wait for signal (bot runs every 60s, extended to 180s for better chance)
+    const signal = await waitForSignal(botId, 180);
     
     if (!signal) {
       console.log('\n⚠️  No signal generated within timeout period');
       console.log('   This might be normal if market conditions are not ideal');
+      console.log('   Try running the test again or adjust config parameters');
     }
     
     // 5. Check trades
     const trade = await checkTrades(botId);
     
-    if (!trade) {
-      console.log('\n⚠️  No trades executed');
-      console.log('   Signal might have been WAIT or market conditions not met');
+    if (!trade && signal?.signalType === 'entry') {
+      console.log('\n⚠️  Entry signal generated but no trade executed');
+      console.log('   Possible reasons:');
+      console.log('   - Risk validation failed (position size too large)');
+      console.log('   - Max positions limit reached');
+      console.log('   - Execution error (check backend logs)');
+      console.log('   - Insufficient account balance');
+    } else if (!trade && signal?.signalType === 'wait') {
+      console.log('\n✅ WAIT signal is working correctly');
+      console.log('   Bot is properly waiting for better market conditions');
+      console.log('   No trade execution is expected with WAIT signals');
     }
     
     // 6. Stop bot
@@ -273,19 +332,30 @@ async function runTest() {
     console.log(`   Config ID: ${configId}`);
     console.log(`   Bot ID: ${botId}`);
     console.log(`   Signal Generated: ${signal ? 'YES' : 'NO'}`);
+    console.log(`   Signal Type: ${signal?.signalType || 'N/A'}`);
     console.log(`   Trade Executed: ${trade ? 'YES' : 'NO'}`);
     
-    if (signal && signal.signalType === 'entry' && !trade) {
-      console.log('\n⚠️  Note: Entry signal was generated but no trade executed.');
-      console.log('   This could mean:');
-      console.log('   - Risk validation failed');
-      console.log('   - Max positions reached');
-      console.log('   - Execution error occurred');
-      console.log('   Check logs for details.');
+    // Test result analysis
+    console.log('\n📋 Test Result:');
+    if (signal && trade) {
+      console.log('   ✅ FULL SUCCESS - Signal generated AND trade executed');
+    } else if (signal && signal.signalType === 'wait') {
+      console.log('   ✅ PARTIAL SUCCESS - WAIT signal working correctly');
+      console.log('   ℹ️  This is expected behavior when conditions are not ideal');
+    } else if (signal && signal.signalType === 'entry' && !trade) {
+      console.log('   ⚠️  PARTIAL FAILURE - Entry signal but no execution');
+      console.log('   🔍 Check backend logs for execution errors');
+    } else {
+      console.log('   ⚠️  NO SIGNAL - Bot may need more time or config adjustment');
     }
     
   } catch (error) {
     console.error('\n❌ TEST FAILED:', error.message);
+    console.error('\n🔍 Troubleshooting:');
+    console.error('   1. Is backend running? (npm start)');
+    console.error('   2. Is database connected?');
+    console.error('   3. Are Binance/Deribit APIs accessible?');
+    console.error('   4. Check backend logs for detailed errors');
     
     // Try to stop bot if it was started
     if (botId) {

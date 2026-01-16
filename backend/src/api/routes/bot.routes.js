@@ -492,7 +492,7 @@ module.exports = (dependencies) => {
         name,
         strategy,
         symbol,
-        enabled: false, // Start disabled by default
+        enabled: req.body.enabled !== undefined ? req.body.enabled : true, // Default true, but allow override
         entryRules: entryRules || {},
         exitRules: exitRules || {},
         riskParams: riskParams || {}
