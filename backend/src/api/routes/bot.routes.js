@@ -492,7 +492,7 @@ module.exports = (dependencies) => {
         name,
         strategy,
         symbol,
-        enabled: false, // Start disabled by default
+        enabled: true, // Start disabled by default
         entryRules: entryRules || {},
         exitRules: exitRules || {},
         riskParams: riskParams || {}
