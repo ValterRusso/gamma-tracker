@@ -1,5 +1,6 @@
 const Logger = require('../../utils/logger');
 const StrategyFactory = require('./strategies/StrategyFactory');
+const axios = require('axios');
 
 /**
  * Signal Generation Engine (Refactored)
@@ -89,9 +90,27 @@ class SignalEngine {
    */
   async fetchMarketData() {
     try {
-      // Fetch from existing options service
+      // 1. Fetch options data
       const optionsData = await this.optionsService.getAllOptions();
-      const spotPrice = await this.optionsService.getCurrentSpot();
+      
+      // 2. Fetch spot price from API endpoint (more reliable than DataCollector)
+      let spotPrice;
+      try {
+        const apiPort = process.env.API_PORT || 3300;
+        const statsResponse = await axios.get(`http://localhost:${apiPort}/api/binance/stats`);
+        
+        if (statsResponse.data.success && statsResponse.data.data.spotPrice) {
+          spotPrice = statsResponse.data.data.spotPrice;
+          this.logger.info(`[SignalEngine] Spot price from API: $${spotPrice.toFixed(2)}`);
+        } else {
+          throw new Error('Invalid response from /api/binance/stats');
+        }
+      } catch (apiError) {
+        // Fallback: try OptionsService (may fail if DataCollector not ready)
+        this.logger.warn(`[SignalEngine] API endpoint failed, trying OptionsService fallback: ${apiError.message}`);
+        spotPrice = await this.optionsService.getCurrentSpot();
+        this.logger.info(`[SignalEngine] Spot price from OptionsService: $${spotPrice.toFixed(2)}`);
+      }
       
       return {
         spot: spotPrice,
