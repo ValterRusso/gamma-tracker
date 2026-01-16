@@ -337,41 +337,41 @@ async function main() {
     // Test Bull Call Spread
     console.log('\n📈 Testing Bull Call Spread (Bullish 2-leg strategy)...\n');
     await testStrategy('bull_call_spread', {
-      accountBalance: 10000,
-      riskPercent: 2,
+      accountBalance: 1000000,
+      riskPercent: 35,
       minIVRank: 0,
       maxIVRank: 100,
-      minDTE: 30,
-      maxDTE: 60,
-      longDelta: 0.60,
-      shortDelta: 0.40,
+      minDTE: 5,
+      maxDTE: 30,
+      longDelta: 0.55,
+      shortDelta: 0.35,
       deltaTolerance: 0.15,
-      minSpreadWidth: 1000,
-      maxSpreadWidth: 15000,
+      minSpreadWidth: 3000,
+      maxSpreadWidth: 8000,
       minVolume: 0,
       minOI: 0,
       profitTarget: 0.5,
-      stopLoss: 0.75
+      stopLoss: 5
     }, marketData, indicators);
 
     // Test Bear Put Spread
     console.log('\n📉 Testing Bear Put Spread (Bearish 2-leg strategy)...\n');
     await testStrategy('bear_put_spread', {
       accountBalance: 10000,
-      riskPercent: 2,
+      riskPercent: 35,
       minIVRank: 0,
       maxIVRank: 100,
-      minDTE: 30,
-      maxDTE: 60,
-      longDelta: -0.60,
-      shortDelta: -0.40,
+      minDTE: 5,
+      maxDTE: 30,
+      longDelta: -0.55,
+      shortDelta: -0.35,
       deltaTolerance: 0.15,
-      minSpreadWidth: 1000,
-      maxSpreadWidth: 15000,
+      minSpreadWidth: 3000,
+      maxSpreadWidth: 8000,
       minVolume: 0,
       minOI: 0,
       profitTarget: 0.5,
-      stopLoss: 0.75
+      stopLoss: 5
     }, marketData, indicators);
 
     console.log('\n' + '█'.repeat(80));
