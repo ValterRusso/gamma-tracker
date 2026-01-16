@@ -1,92 +1,101 @@
 /**
- * Test Script for Trading Strategies (REAL DATA)
- * Tests Iron Condor and Iron Butterfly with REAL market data from DataCollector
+ * Test Script for Trading Strategies (REAL DATA - HTTP ONLY)
+ * Tests Iron Condor and Iron Butterfly with REAL market data from HTTP endpoints
  * 
  * USAGE:
- * 1. Make sure backend is running (DataCollector collecting data)
+ * 1. Make sure backend is running on port 3300
  * 2. Run: node test-strategies-real.js
+ * 
+ * NO DEPENDENCIES ON DataCollector or OptionsService - Pure HTTP!
  */
 
 const StrategyFactory = require('./src/services/TradingBot/strategies/StrategyFactory');
-const DataCollector = require('./src/collectors/DataCollector');
-const OptionsService = require('./src/services/OptionsService');
 const axios = require('axios');
 
-/**
- * Initialize DataCollector and OptionsService
- */
-async function initialize() {
-  console.log('\n🔧 Initializing DataCollector...');
-  
-  // Create DataCollector instance
-  const dataCollector = new DataCollector();
-  
-  // Wait for initial data collection (give it a few seconds)
-  console.log('⏳ Waiting for data collection (5 seconds)...');
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  
-  // Create OptionsService
-  const optionsService = new OptionsService(dataCollector);
-  
-  console.log('✅ Initialization complete\n');
-  
-  return { dataCollector, optionsService };
-}
+const API_BASE = 'http://localhost:3300/api';
 
 /**
- * Fetch real market data
+ * Fetch real market data from HTTP endpoints
  */
-async function fetchRealMarketData(optionsService) {
+async function fetchRealMarketData() {
   try {
-    console.log('📊 Fetching real market data...');
+    console.log('📊 Fetching real market data from HTTP endpoints...\n');
     
-    // Get spot price from /api/binance/stats endpoint
-    let spot;
-    try {
-      const statsResponse = await axios.get('http://localhost:3300/api/binance/stats');
-      if (statsResponse.data.success && statsResponse.data.data.spotPrice) {
-        spot = statsResponse.data.data.spotPrice;
-        console.log(`   Spot Price: $${spot.toFixed(2)} (from /api/binance/stats)`);
-      } else {
-        throw new Error('Spot price not in stats response');
-      }
-    } catch (error) {
-      console.warn(`   ⚠️  Could not fetch spot from /api/binance/stats: ${error.message}`);
-      console.log('   Trying optionsService.getCurrentSpot()...');
-      spot = await optionsService.getCurrentSpot();
-      console.log(`   Spot Price: $${spot.toFixed(2)} (from DataCollector)`);
+    // 1. Get spot price from /api/binance/stats
+    console.log('   Fetching spot price...');
+    const statsResponse = await axios.get(`${API_BASE}/binance/stats`);
+    
+    if (!statsResponse.data.success) {
+      throw new Error('Stats endpoint returned success=false');
     }
     
-    // Get all options
-    const optionsResult = await optionsService.getAllOptions();
-    const options = optionsResult.options;
-    console.log(`   Options Count: ${options.length}`);
+    const spot = statsResponse.data.data.spotPrice;
+    console.log(`   ✅ Spot Price: $${spot.toFixed(2)}`);
+    console.log(`   📈 Total Options: ${statsResponse.data.data.totalOptions}`);
+    console.log(`   📅 Expiry Count: ${statsResponse.data.data.expiryCount}`);
+    console.log(`   🔢 Valid IV Count: ${statsResponse.data.data.validIVCount}\n`);
+    
+    // 2. Get all options from /api/options
+    console.log('   Fetching options data...');
+    const optionsResponse = await axios.get(`${API_BASE}/options`);
+    
+    if (!optionsResponse.data.success) {
+      throw new Error('Options endpoint returned success=false');
+    }
+    
+    const options = optionsResponse.data.data;
+    console.log(`   ✅ Options fetched: ${options.length}`);
     
     if (options.length === 0) {
-      throw new Error('No options data available. Make sure DataCollector is running and collecting data.');
+      throw new Error('No options data available');
     }
     
-    // Show sample option
+    // 3. Show sample option
     const sampleOption = options[0];
-    console.log(`   Sample Option:`, {
-      symbol: sampleOption.symbol,
-      strike: sampleOption.strike,
-      side: sampleOption.side,
-      delta: sampleOption.delta?.toFixed(4),
-      gamma: sampleOption.gamma?.toFixed(6),
-      theta: sampleOption.theta?.toFixed(2),
-      vega: sampleOption.vega?.toFixed(2),
-      mark_price: sampleOption.mark_price?.toFixed(2)
-    });
+    console.log(`\n   📋 Sample Option:`);
+    console.log(`      Symbol: ${sampleOption.symbol}`);
+    console.log(`      Strike: $${sampleOption.strike}`);
+    console.log(`      Side: ${sampleOption.side}`);
+    console.log(`      Delta: ${sampleOption.delta?.toFixed(4) || 'N/A'}`);
+    console.log(`      Gamma: ${sampleOption.gamma?.toFixed(6) || 'N/A'}`);
+    console.log(`      Theta: ${sampleOption.theta?.toFixed(2) || 'N/A'}`);
+    console.log(`      Vega: ${sampleOption.vega?.toFixed(2) || 'N/A'}`);
+    console.log(`      Mark Price: $${sampleOption.markPrice?.toFixed(2) || 'N/A'}`);
+    console.log(`      Mark IV: ${sampleOption.markIV?.toFixed(4) || 'N/A'}`);
+    console.log(`      Volume: ${sampleOption.volume?.toFixed(2) || 'N/A'}`);
+    console.log(`      OI: ${sampleOption.openInterest?.toFixed(2) || 'N/A'}`);
+    
+    // 4. Normalize option data format
+    const normalizedOptions = options.map(opt => ({
+      symbol: opt.symbol,
+      underlying: opt.underlying,
+      strike: opt.strike,
+      side: opt.side,
+      expiry: opt.expiryDate,
+      delta: opt.delta,
+      gamma: opt.gamma,
+      theta: opt.theta,
+      vega: opt.vega,
+      mark_price: opt.markPrice,
+      bid_price: opt.markPrice * 0.98, // Approximate bid
+      ask_price: opt.markPrice * 1.02, // Approximate ask
+      impliedVolatility: opt.markIV,
+      volume: opt.volume || 0,
+      open_interest: opt.openInterest || 0,
+      contractSize: opt.contractSize || 1
+    }));
     
     return {
       spot,
-      options,
+      options: normalizedOptions,
       timestamp: new Date()
     };
     
   } catch (error) {
-    console.error('❌ Error fetching market data:', error.message);
+    console.error('\n❌ Error fetching market data:', error.message);
+    if (error.code === 'ECONNREFUSED') {
+      console.error('   💡 Make sure backend is running on port 3300');
+    }
     throw error;
   }
 }
@@ -97,15 +106,15 @@ async function fetchRealMarketData(optionsService) {
 function calculateIndicators(marketData) {
   const { spot, options } = marketData;
   
-  console.log('\n📈 Calculating indicators...');
+  console.log('\n📈 Calculating indicators...\n');
   
-  // Calculate IV Rank (simplified - using current IV range)
+  // Calculate IV statistics
   const ivs = options
-    .filter(opt => opt.impliedVolatility || opt.markIV)
-    .map(opt => opt.impliedVolatility || opt.markIV);
+    .filter(opt => opt.impliedVolatility && opt.impliedVolatility > 0)
+    .map(opt => opt.impliedVolatility);
   
   if (ivs.length === 0) {
-    console.warn('⚠️  No IV data available');
+    console.error('❌ No IV data available');
     return null;
   }
   
@@ -116,11 +125,11 @@ function calculateIndicators(marketData) {
   
   console.log(`   Current IV: ${currentIV.toFixed(4)}`);
   console.log(`   IV Range: ${minIV.toFixed(4)} - ${maxIV.toFixed(4)}`);
-  console.log(`   IV Rank: ${ivRank.toFixed(1)}`);
+  console.log(`   📊 IV Rank: ${ivRank.toFixed(1)}`);
   
   // Calculate total volume and OI
   const totalVolume = options.reduce((sum, opt) => sum + (opt.volume || 0), 0);
-  const totalOI = options.reduce((sum, opt) => sum + (opt.open_interest || opt.openInterest || 0), 0);
+  const totalOI = options.reduce((sum, opt) => sum + (opt.open_interest || 0), 0);
   
   console.log(`   Total Volume: ${totalVolume.toFixed(2)}`);
   console.log(`   Total OI: ${totalOI.toFixed(2)}`);
@@ -138,11 +147,11 @@ function calculateIndicators(marketData) {
   const calls = options.filter(opt => opt.side === 'CALL');
   
   const avgPutIV = puts.length > 0
-    ? puts.reduce((sum, opt) => sum + (opt.impliedVolatility || opt.markIV || 0), 0) / puts.length
+    ? puts.reduce((sum, opt) => sum + (opt.impliedVolatility || 0), 0) / puts.length
     : 0;
   
   const avgCallIV = calls.length > 0
-    ? calls.reduce((sum, opt) => sum + (opt.impliedVolatility || opt.markIV || 0), 0) / calls.length
+    ? calls.reduce((sum, opt) => sum + (opt.impliedVolatility || 0), 0) / calls.length
     : 0;
   
   const skew = avgPutIV - avgCallIV;
@@ -157,7 +166,19 @@ function calculateIndicators(marketData) {
   } else if (ivRank < 40) {
     regime = 'LOW_IV';
   }
-  console.log(`   Regime: ${regime}`);
+  console.log(`   🎯 Regime: ${regime}`);
+  
+  // Calculate average Greeks
+  const avgDelta = options.reduce((sum, opt) => sum + Math.abs(opt.delta || 0), 0) / options.length;
+  const avgGamma = options.reduce((sum, opt) => sum + (opt.gamma || 0), 0) / options.length;
+  const avgTheta = options.reduce((sum, opt) => sum + (opt.theta || 0), 0) / options.length;
+  const avgVega = options.reduce((sum, opt) => sum + (opt.vega || 0), 0) / options.length;
+  
+  console.log(`\n   📊 Average Greeks:`);
+  console.log(`      Delta: ${avgDelta.toFixed(4)}`);
+  console.log(`      Gamma: ${avgGamma.toFixed(6)}`);
+  console.log(`      Theta: ${avgTheta.toFixed(2)}`);
+  console.log(`      Vega: ${avgVega.toFixed(2)}`);
   
   return {
     spot,
@@ -205,7 +226,8 @@ async function testStrategy(strategyName, config, marketData, indicators) {
       console.log('✅ Entry conditions met');
     } else {
       console.log('❌ Entry conditions not met');
-      console.log('   (This is normal if market conditions are not ideal for this strategy)');
+      console.log('   💡 This is normal if market conditions are not ideal for this strategy');
+      console.log(`   📊 Current IV Rank: ${indicators.ivRank.toFixed(1)} (strategy requires > ${config.minIVRank})`);
       return;
     }
 
@@ -215,59 +237,64 @@ async function testStrategy(strategyName, config, marketData, indicators) {
     
     if (!selection) {
       console.log('❌ Could not find suitable strikes');
-      console.log('   Possible reasons:');
-      console.log('   - Not enough options with required delta');
-      console.log('   - Insufficient liquidity');
-      console.log('   - No suitable expiry dates');
+      console.log('   💡 Possible reasons:');
+      console.log('      - Not enough options with required delta');
+      console.log('      - Insufficient liquidity');
+      console.log('      - No suitable expiry dates');
+      console.log('      - Greeks validation failed');
       return;
     }
 
-    console.log('✅ Strikes selected:');
+    console.log('✅ Strikes selected successfully!\n');
+    console.log('   📋 Position Legs:');
     selection.legs.forEach((leg, i) => {
       const opt = leg.option;
-      console.log(`   Leg ${i + 1}: ${leg.action} ${opt.side} @ $${opt.strike}`);
-      console.log(`          Delta: ${opt.delta?.toFixed(4) || 'N/A'}, ` +
-                  `Gamma: ${opt.gamma?.toFixed(6) || 'N/A'}, ` +
-                  `Theta: ${opt.theta?.toFixed(2) || 'N/A'}`);
-      console.log(`          Price: $${(opt.mark_price || opt.bid_price || 0).toFixed(2)}, ` +
-                  `Volume: ${(opt.volume || 0).toFixed(2)}, ` +
-                  `OI: ${(opt.open_interest || opt.openInterest || 0).toFixed(2)}`);
+      console.log(`\n   Leg ${i + 1}: ${leg.action} ${opt.side} @ $${opt.strike}`);
+      console.log(`      Delta: ${opt.delta?.toFixed(4) || 'N/A'}`);
+      console.log(`      Gamma: ${opt.gamma?.toFixed(6) || 'N/A'}`);
+      console.log(`      Theta: ${opt.theta?.toFixed(2) || 'N/A'}`);
+      console.log(`      Vega: ${opt.vega?.toFixed(2) || 'N/A'}`);
+      console.log(`      Price: $${(opt.mark_price || 0).toFixed(2)}`);
+      console.log(`      Volume: ${(opt.volume || 0).toFixed(2)}`);
+      console.log(`      OI: ${(opt.open_interest || 0).toFixed(2)}`);
     });
 
-    console.log('\n   Position Greeks:');
-    console.log(`   Delta: ${selection.greeks.delta.toFixed(4)}`);
-    console.log(`   Gamma: ${selection.greeks.gamma.toFixed(6)}`);
-    console.log(`   Theta: ${selection.greeks.theta.toFixed(2)}`);
-    console.log(`   Vega: ${selection.greeks.vega.toFixed(2)}`);
+    console.log('\n   🎯 Position Greeks (Net):');
+    console.log(`      Delta: ${selection.greeks.delta.toFixed(4)}`);
+    console.log(`      Gamma: ${selection.greeks.gamma.toFixed(6)}`);
+    console.log(`      Theta: ${selection.greeks.theta.toFixed(2)}`);
+    console.log(`      Vega: ${selection.greeks.vega.toFixed(2)}`);
 
-    console.log('\n   Risk/Reward:');
-    console.log(`   Max Profit: $${selection.maxProfit.toFixed(2)}`);
-    console.log(`   Max Loss: $${selection.maxLoss.toFixed(2)}`);
-    console.log(`   Risk/Reward Ratio: ${(selection.maxProfit / selection.maxLoss).toFixed(2)}`);
+    console.log('\n   💰 Risk/Reward:');
+    console.log(`      Max Profit: $${selection.maxProfit.toFixed(2)}`);
+    console.log(`      Max Loss: $${selection.maxLoss.toFixed(2)}`);
+    console.log(`      Risk/Reward Ratio: ${(selection.maxProfit / selection.maxLoss).toFixed(2)}`);
 
     if (selection.breakEven) {
-      console.log('\n   Break-Even Points:');
-      console.log(`   Lower: $${selection.breakEven.lower.toFixed(2)} ` +
-                  `(${((selection.breakEven.lower - marketData.spot) / marketData.spot * 100).toFixed(2)}% from spot)`);
-      console.log(`   Upper: $${selection.breakEven.upper.toFixed(2)} ` +
-                  `(${((selection.breakEven.upper - marketData.spot) / marketData.spot * 100).toFixed(2)}% from spot)`);
-      console.log(`   Range: $${(selection.breakEven.upper - selection.breakEven.lower).toFixed(2)} ` +
-                  `(${((selection.breakEven.upper - selection.breakEven.lower) / marketData.spot * 100).toFixed(2)}% of spot)`);
+      const lowerPct = ((selection.breakEven.lower - marketData.spot) / marketData.spot * 100);
+      const upperPct = ((selection.breakEven.upper - marketData.spot) / marketData.spot * 100);
+      const rangePct = ((selection.breakEven.upper - selection.breakEven.lower) / marketData.spot * 100);
+      
+      console.log('\n   📍 Break-Even Points:');
+      console.log(`      Lower: $${selection.breakEven.lower.toFixed(2)} (${lowerPct.toFixed(2)}% from spot)`);
+      console.log(`      Upper: $${selection.breakEven.upper.toFixed(2)} (${upperPct.toFixed(2)}% from spot)`);
+      console.log(`      Range: $${(selection.breakEven.upper - selection.breakEven.lower).toFixed(2)} (${rangePct.toFixed(2)}% of spot)`);
     }
 
     // 5. Generate signal
     console.log('\n5. Generating signal...');
     const signal = await strategy.generateSignal(marketData, indicators, marketData.options);
     
-    console.log(`✅ Signal generated: ${signal.signalType.toUpperCase()}`);
+    console.log(`\n✅ Signal generated: ${signal.signalType.toUpperCase()}`);
     console.log(`   Strategy: ${signal.strategy}`);
     console.log(`   Confidence: ${(signal.confidence * 100).toFixed(1)}%`);
     console.log(`   Reason: ${signal.reason}`);
 
     if (signal.position) {
-      console.log(`   Position Size: ${signal.position.contracts} contracts`);
-      console.log(`   Total Risk: $${signal.position.totalRisk.toFixed(2)}`);
-      console.log(`   Risk %: ${signal.position.riskPercent.toFixed(2)}%`);
+      console.log(`\n   📦 Position Details:`);
+      console.log(`      Contracts: ${signal.position.contracts}`);
+      console.log(`      Total Risk: $${signal.position.totalRisk.toFixed(2)}`);
+      console.log(`      Risk %: ${signal.position.riskPercent.toFixed(2)}%`);
     }
 
     console.log('\n✅ TEST COMPLETED SUCCESSFULLY\n');
@@ -283,22 +310,19 @@ async function testStrategy(strategyName, config, marketData, indicators) {
  */
 async function main() {
   console.log('\n' + '█'.repeat(80));
-  console.log('TRADING STRATEGY TEST SUITE (REAL DATA)');
-  console.log('█'.repeat(80));
+  console.log('TRADING STRATEGY TEST SUITE (REAL DATA - HTTP)');
+  console.log('█'.repeat(80) + '\n');
 
   try {
-    // Initialize
-    const { dataCollector, optionsService } = await initialize();
-    
-    // Fetch real market data
-    const marketData = await fetchRealMarketData(optionsService);
+    // Fetch real market data from HTTP endpoints
+    const marketData = await fetchRealMarketData();
     
     // Calculate indicators
     const indicators = calculateIndicators(marketData);
     
     if (!indicators) {
       console.error('\n❌ Could not calculate indicators. Exiting.');
-      return;
+      process.exit(1);
     }
     
     // Test Iron Condor
