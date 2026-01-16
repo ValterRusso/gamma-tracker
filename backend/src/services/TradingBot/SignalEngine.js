@@ -108,8 +108,8 @@ class SignalEngine {
       } catch (apiError) {
         // Fallback: try OptionsService (may fail if DataCollector not ready)
         this.logger.warn(`[SignalEngine] API endpoint failed, trying OptionsService fallback: ${apiError.message}`);
-        spotPrice = await this.optionsService.getCurrentSpot();
-        this.logger.info(`[SignalEngine] Spot price from OptionsService: $${spotPrice.toFixed(2)}`);
+        // spotPrice = await this.optionsService.getCurrentSpot();
+        this.logger.info(`[SignalEngine] Spot price from OptionsService: $${spotPrice}`);
       }
       
       return {
