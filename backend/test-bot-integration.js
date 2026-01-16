@@ -21,35 +21,35 @@ const BASE_URL = 'http://localhost:3300/api';
 
 // Test configuration (matches bot_configs table structure)
 const TEST_CONFIG = {
-  name: 'Test Bull Call Spread Bot',
-  strategy: 'bull_call_spread',
-  symbol: 'BTC-USDT',
-  enabled: true,
-  description: 'Integration test bot for Bull Call Spread strategy',
-  entry_rules: {
-    longDelta: 0.60,
-    shortDelta: 0.40,
-    minDTE: 20,
-    maxDTE: 60,
-    minVolume: 0,
-    minOI: 0,
-    maxSpread: 0.15,
-    minSpreadWidth: 1000,
-    maxSpreadWidth: 15000,
-    minIVRank: 0,
-    maxIVRank: 100
-  },
-  exit_rules: {
-    profitTarget: 0.5,
-    stopLoss: 2.0,
-    dteExit: 21,
-    deltaBreach: 0.30
-  },
-  risk_params: {
-    accountBalance: 100000,
-    riskPercent: 5,
-    maxPositions: 1,
-    maxLossPerTrade: 5000
+  
+  "name": "Bull Call Spread - Aggressive",
+  "strategy": "bull_call_spread",
+  "symbol": "BTC-USDT",  
+  "description": "Bullish debit spread...",  
+  "entryRules": {
+    "longDelta": 0.60,
+    "shortDelta": 0.40,
+    "minDTE": 30,
+    "maxDTE": 60,
+    "minVolume": 0,
+    "minOI": 0,
+    "minIVRank": 0,
+    "maxIVRank": 100,
+    "maxSpread": 0.15,
+    "minSpreadWidth": 1000,
+    "maxSpreadWidth": 15000
+  },  
+  "exitRules": {
+    "profitTarget": 0.5,
+    "stopLoss": 2.0,
+    "dteExit": 21,
+    "deltaBreach": 0.30
+  },  
+  "riskParams": {
+    "accountBalance": 100000,
+    "riskPercent": 5,
+    "maxPositions": 3,
+    "maxLossPerTrade": 5000
   }
 };
 
@@ -61,7 +61,7 @@ async function createBotConfig() {
   console.log('\n1️⃣  Creating bot config...');
   
   try {
-    const response = await axios.post(`${BASE_URL}/bot/config`, TEST_CONFIG);
+    const response = await axios.post(`${BASE_URL}/bot/configs`, TEST_CONFIG);
     
     if (response.data.success) {
       console.log(`   ✅ Config created: ${response.data.data.id}`);
