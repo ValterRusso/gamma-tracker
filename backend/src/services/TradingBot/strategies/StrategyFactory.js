@@ -1,5 +1,7 @@
 const IronCondor = require('./volatility-selling/IronCondor');
 const IronButterfly = require('./volatility-selling/IronButterfly');
+const BullCallSpread = require('./debit-spreads/BullCallSpread');
+const BearPutSpread = require('./debit-spreads/BearPutSpread');
 const Logger = require('../../../utils/logger');
 
 /**
@@ -12,14 +14,19 @@ class StrategyFactory {
     
     // Registry of available strategies
     this.strategies = {
+      // Volatility Selling (4 legs)
       'iron_condor': IronCondor,
-      'iron_butterfly': IronButterfly
-      // Add more strategies here as they are implemented
+      'iron_butterfly': IronButterfly,
+      
+      // Debit Spreads (2 legs)
+      'bull_call_spread': BullCallSpread,
+      'bear_put_spread': BearPutSpread
+      
+      // TODO: Add more strategies as they are implemented
       // 'credit_spreads': CreditSpreads,
       // 'short_strangle': ShortStrangle,
       // 'long_straddle': LongStraddle,
       // 'long_strangle': LongStrangle,
-      // 'debit_spreads': DebitSpreads,
       // 'gamma_scalping': GammaScalping,
       // 'vega_play': VegaPlay,
       // 'theta_harvesting': ThetaHarvesting
