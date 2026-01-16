@@ -19,13 +19,14 @@ const axios = require('axios');
 
 const BASE_URL = 'http://localhost:3300/api';
 
-// Test configuration
+// Test configuration (matches bot_configs table structure)
 const TEST_CONFIG = {
   name: 'Test Bull Call Spread Bot',
   strategy: 'bull_call_spread',
-  symbol: 'BTC',
+  symbol: 'BTC-USDT',
   enabled: true,
-  strategyParams: {
+  description: 'Integration test bot for Bull Call Spread strategy',
+  entry_rules: {
     longDelta: 0.60,
     shortDelta: 0.40,
     minDTE: 20,
@@ -35,14 +36,18 @@ const TEST_CONFIG = {
     maxSpread: 0.15,
     minSpreadWidth: 1000,
     maxSpreadWidth: 15000,
-    accountBalance: 100000,
-    riskPercent: 5,
+    minIVRank: 0,
+    maxIVRank: 100
+  },
+  exit_rules: {
     profitTarget: 0.5,
     stopLoss: 2.0,
     dteExit: 21,
     deltaBreach: 0.30
   },
-  riskParams: {
+  risk_params: {
+    accountBalance: 100000,
+    riskPercent: 5,
     maxPositions: 1,
     maxLossPerTrade: 5000
   }

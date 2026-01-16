@@ -24,9 +24,18 @@ class SignalEngine {
 
     // Create strategy instance
     try {
+      // Merge entry_rules, exit_rules, risk_params into strategyParams
+      // This allows flexible config storage in database JSON fields
+      const strategyParams = {
+        ...(this.config.entry_rules || {}),
+        ...(this.config.exit_rules || {}),
+        ...(this.config.risk_params || {}),
+        ...(this.config.strategyParams || {}) // Backward compatibility
+      };
+      
       this.strategy = StrategyFactory.create(
         this.config.strategy,
-        this.config.strategyParams || {}
+        strategyParams
       );
       this.logger.info(`[SignalEngine] Loaded strategy: ${this.strategy.name}`);
     } catch (error) {

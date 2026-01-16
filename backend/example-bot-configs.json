@@ -1,0 +1,259 @@
+{
+  "configs": [
+    {
+      "name": "Bull Call Spread - Aggressive",
+      "strategy": "bull_call_spread",
+      "symbol": "BTC-USDT",
+      "enabled": true,
+      "description": "Bullish debit spread for upward price movement. Buys lower strike call, sells higher strike call. Limited risk and reward.",
+      "entry_rules": {
+        "longDelta": 0.60,
+        "shortDelta": 0.40,
+        "minDTE": 30,
+        "maxDTE": 60,
+        "minVolume": 0,
+        "minOI": 0,
+        "minIVRank": 0,
+        "maxIVRank": 100,
+        "maxSpread": 0.15,
+        "minSpreadWidth": 1000,
+        "maxSpreadWidth": 15000
+      },
+      "exit_rules": {
+        "profitTarget": 0.5,
+        "stopLoss": 2.0,
+        "dteExit": 21,
+        "deltaBreach": 0.30
+      },
+      "risk_params": {
+        "accountBalance": 100000,
+        "riskPercent": 5,
+        "maxPositions": 3,
+        "maxLossPerTrade": 5000
+      }
+    },
+    {
+      "name": "Bear Put Spread - Conservative",
+      "strategy": "bear_put_spread",
+      "symbol": "BTC-USDT",
+      "enabled": true,
+      "description": "Bearish debit spread for downward price movement. Buys higher strike put, sells lower strike put. Limited risk and reward.",
+      "entry_rules": {
+        "longDelta": -0.60,
+        "shortDelta": -0.40,
+        "minDTE": 30,
+        "maxDTE": 60,
+        "minVolume": 0,
+        "minOI": 0,
+        "minIVRank": 0,
+        "maxIVRank": 100,
+        "maxSpread": 0.15,
+        "minSpreadWidth": 1000,
+        "maxSpreadWidth": 15000
+      },
+      "exit_rules": {
+        "profitTarget": 0.5,
+        "stopLoss": 2.0,
+        "dteExit": 21,
+        "deltaBreach": 0.30
+      },
+      "risk_params": {
+        "accountBalance": 100000,
+        "riskPercent": 3,
+        "maxPositions": 2,
+        "maxLossPerTrade": 3000
+      }
+    },
+    {
+      "name": "Iron Condor - High IV",
+      "strategy": "iron_condor",
+      "symbol": "BTC-USDT",
+      "enabled": true,
+      "description": "Neutral credit spread for range-bound markets. Sells OTM call and put, buys further OTM protection. Profits from time decay and IV crush.",
+      "entry_rules": {
+        "callDelta": -0.16,
+        "putDelta": 0.16,
+        "minDTE": 30,
+        "maxDTE": 45,
+        "minVolume": 0.1,
+        "minOI": 1,
+        "minIVRank": 60,
+        "maxIVRank": 100,
+        "maxSpread": 0.10,
+        "wingWidth": 5000,
+        "maxDeltaTotal": 0.10,
+        "minTheta": 10
+      },
+      "exit_rules": {
+        "profitTarget": 0.5,
+        "stopLoss": 2.0,
+        "dteExit": 21,
+        "deltaBreach": 0.25
+      },
+      "risk_params": {
+        "accountBalance": 100000,
+        "riskPercent": 2,
+        "maxPositions": 5,
+        "maxLossPerTrade": 2000
+      }
+    },
+    {
+      "name": "Iron Butterfly - Pinning Play",
+      "strategy": "iron_butterfly",
+      "symbol": "BTC-USDT",
+      "enabled": true,
+      "description": "Neutral credit spread with ATM shorts. Profits from price pinning at strike. Higher premium but narrower profit zone than Iron Condor.",
+      "entry_rules": {
+        "atmDelta": 0.50,
+        "minDTE": 21,
+        "maxDTE": 35,
+        "minVolume": 0.1,
+        "minOI": 1,
+        "minIVRank": 70,
+        "maxIVRank": 100,
+        "maxSpread": 0.10,
+        "wingWidth": 5000,
+        "maxDeltaTotal": 0.10,
+        "minTheta": 15,
+        "atmTolerance": 0.05
+      },
+      "exit_rules": {
+        "profitTarget": 0.5,
+        "stopLoss": 2.0,
+        "dteExit": 14,
+        "deltaBreach": 0.20
+      },
+      "risk_params": {
+        "accountBalance": 100000,
+        "riskPercent": 2,
+        "maxPositions": 3,
+        "maxLossPerTrade": 2000
+      }
+    },
+    {
+      "name": "Bull Call Spread - Day Trade",
+      "strategy": "bull_call_spread",
+      "symbol": "BTC-USDT",
+      "enabled": false,
+      "description": "Short-term bullish play for intraday movement. Tighter stops and faster exits.",
+      "entry_rules": {
+        "longDelta": 0.65,
+        "shortDelta": 0.45,
+        "minDTE": 7,
+        "maxDTE": 21,
+        "minVolume": 1,
+        "minOI": 10,
+        "minIVRank": 0,
+        "maxIVRank": 100,
+        "maxSpread": 0.10,
+        "minSpreadWidth": 2000,
+        "maxSpreadWidth": 8000
+      },
+      "exit_rules": {
+        "profitTarget": 0.3,
+        "stopLoss": 1.5,
+        "dteExit": 7,
+        "deltaBreach": 0.20,
+        "timeBasedExit": 4
+      },
+      "risk_params": {
+        "accountBalance": 50000,
+        "riskPercent": 2,
+        "maxPositions": 1,
+        "maxLossPerTrade": 1000,
+        "maxDailyLoss": 2000
+      }
+    },
+    {
+      "name": "Bear Put Spread - Hedge",
+      "strategy": "bear_put_spread",
+      "symbol": "BTC-USDT",
+      "enabled": false,
+      "description": "Protective put spread for portfolio hedging. Lower delta for cost efficiency.",
+      "entry_rules": {
+        "longDelta": -0.40,
+        "shortDelta": -0.25,
+        "minDTE": 60,
+        "maxDTE": 90,
+        "minVolume": 0,
+        "minOI": 0,
+        "minIVRank": 0,
+        "maxIVRank": 100,
+        "maxSpread": 0.20,
+        "minSpreadWidth": 3000,
+        "maxSpreadWidth": 10000
+      },
+      "exit_rules": {
+        "profitTarget": 1.0,
+        "stopLoss": 3.0,
+        "dteExit": 30,
+        "deltaBreach": 0.40
+      },
+      "risk_params": {
+        "accountBalance": 200000,
+        "riskPercent": 1,
+        "maxPositions": 1,
+        "maxLossPerTrade": 2000
+      }
+    }
+  ],
+  "notes": {
+    "usage": "POST these configs to /api/bot/config to create them in database",
+    "format": {
+      "name": "Descriptive name for the bot",
+      "strategy": "One of: bull_call_spread, bear_put_spread, iron_condor, iron_butterfly",
+      "symbol": "Trading pair (e.g., BTC-USDT)",
+      "enabled": "true/false - whether bot can be started",
+      "description": "Optional description of the strategy",
+      "entry_rules": "Strategy-specific parameters for entry conditions",
+      "exit_rules": "Exit conditions (profit target, stop loss, etc.)",
+      "risk_params": "Risk management parameters"
+    },
+    "strategy_params": {
+      "bull_call_spread": {
+        "longDelta": "Delta for long call (e.g., 0.60)",
+        "shortDelta": "Delta for short call (e.g., 0.40)",
+        "minDTE": "Minimum days to expiration",
+        "maxDTE": "Maximum days to expiration",
+        "minSpreadWidth": "Minimum strike width in dollars",
+        "maxSpreadWidth": "Maximum strike width in dollars"
+      },
+      "bear_put_spread": {
+        "longDelta": "Delta for long put (e.g., -0.60)",
+        "shortDelta": "Delta for short put (e.g., -0.40)",
+        "minDTE": "Minimum days to expiration",
+        "maxDTE": "Maximum days to expiration",
+        "minSpreadWidth": "Minimum strike width in dollars",
+        "maxSpreadWidth": "Maximum strike width in dollars"
+      },
+      "iron_condor": {
+        "callDelta": "Delta for short call (e.g., -0.16)",
+        "putDelta": "Delta for short put (e.g., 0.16)",
+        "wingWidth": "Width of wings in dollars (e.g., 5000)",
+        "minIVRank": "Minimum IV Rank (e.g., 60)",
+        "maxDeltaTotal": "Max total delta (e.g., 0.10)",
+        "minTheta": "Minimum theta (e.g., 10)"
+      },
+      "iron_butterfly": {
+        "atmDelta": "ATM delta (e.g., 0.50)",
+        "wingWidth": "Width of wings in dollars (e.g., 5000)",
+        "minIVRank": "Minimum IV Rank (e.g., 70)",
+        "atmTolerance": "ATM tolerance (e.g., 0.05)",
+        "minTheta": "Minimum theta (e.g., 15)"
+      }
+    },
+    "common_params": {
+      "minVolume": "Minimum volume per option",
+      "minOI": "Minimum open interest",
+      "maxSpread": "Maximum bid-ask spread (as % of mark price)",
+      "profitTarget": "Close at X% of max profit (e.g., 0.5 = 50%)",
+      "stopLoss": "Close at X% of max loss (e.g., 2.0 = 200%)",
+      "dteExit": "Close when DTE reaches this value",
+      "deltaBreach": "Close if delta exceeds this threshold",
+      "accountBalance": "Account size for position sizing",
+      "riskPercent": "Risk % of account per trade",
+      "maxPositions": "Maximum concurrent positions",
+      "maxLossPerTrade": "Maximum loss per trade in dollars"
+    }
+  }
+}
