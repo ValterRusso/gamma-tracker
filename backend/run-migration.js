@@ -5,16 +5,22 @@
  * Usage: node run-migration.js
  */
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 const Database = require('./src/database/Database');
 const migration = require('./src/database/migrations/20260118-add-symbol-to-bot-configs');
 
 async function runMigration() {
   console.log('🔧 Starting migration: Add symbol to bot_configs...');
+  console.log(`📊 Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+  console.log(`👤 User: ${process.env.DB_USER}`);
+  console.log('');
   
   try {
     // Initialize database
     const database = new Database();
-    await database.connect();  // ← FIXED: use connect() not initialize()
+    await database.connect();
     
     console.log('✅ Database connected');
     
