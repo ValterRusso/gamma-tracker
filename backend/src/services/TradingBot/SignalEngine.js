@@ -31,6 +31,12 @@ class SignalEngine {
 
     // Create dedicated RSI calculator for this bot
     const timeframe = (this.config.entry_rules?.timeframe || '1h');
+    
+    // Safety check for symbol (should exist after migration)
+    if (!this.config.symbol) {
+      throw new Error('Config is missing required field: symbol. Please run database migration.');
+    }
+    
     const symbol = this.config.symbol.replace('-', ''); // BTC-USDT → BTCUSDT
     
     this.rsiCalculator = new RSICalculatorV2(this.logger, {

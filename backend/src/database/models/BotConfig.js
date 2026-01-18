@@ -18,6 +18,11 @@ module.exports = (sequelize) => {
       allowNull: false,
       comment: 'Strategy type (iron_condor, strangle, etc.)'
     },
+    symbol: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      comment: 'Trading pair symbol (e.g., BTC-USDT, ETH-USDT)'
+    },
     enabled: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
