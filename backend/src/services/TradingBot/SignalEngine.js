@@ -1,5 +1,6 @@
 const Logger = require('../../utils/logger');
 const StrategyFactory = require('./strategies/StrategyFactory');
+const RSICalculatorV2 = require('../../calculators/RSICalculatorV2');
 const axios = require('axios');
 
 /**
@@ -24,9 +25,22 @@ class SignalEngine {
     this.logger = new Logger(`SignalEngine-${botId}`);
 
     // Price and RSI history for divergence detection
-    this.priceHistory = []; // [{timestamp, price}]
-    this.rsiHistory = [];   // [{timestamp, rsi}]
+    this.priceHistory = []; // [{timestamp, value}]
+    this.rsiHistory = [];   // [{timestamp, value}]
     this.maxHistoryLength = 50; // Keep last 50 candles
+
+    // Create dedicated RSI calculator for this bot
+    const timeframe = (this.config.entry_rules?.timeframe || '1h');
+    const symbol = this.config.symbol.replace('-', ''); // BTC-USDT → BTCUSDT
+    
+    this.rsiCalculator = new RSICalculatorV2(this.logger, {
+      symbol: symbol,
+      interval: timeframe,
+      period: 14,
+      candleLimit: this.maxHistoryLength
+    });
+    
+    this.logger.info(`[SignalEngine] RSI Calculator initialized for ${symbol} ${timeframe}`);
 
     // Create strategy instance
     try {
@@ -117,14 +131,8 @@ class SignalEngine {
         this.logger.info(`[SignalEngine] Spot price from OptionsService: $${spotPrice}`);
       }
       
-      // Store price in history
-      const timestamp = Date.now();
-      this.priceHistory.push({ timestamp, value: spotPrice });
-      
-      // Keep only last N candles
-      if (this.priceHistory.length > this.maxHistoryLength) {
-        this.priceHistory.shift();
-      }
+      // Note: Price history is now updated in calculateRSI() from candles
+      // This ensures price history matches RSI timeframe
       
       return {
         spot: spotPrice,
@@ -281,19 +289,28 @@ class SignalEngine {
   }
 
   /**
-   * Calculate RSI (if available)
-   * @param {number} spot - Current spot price
+   * Calculate RSI using dedicated RSICalculatorV2 instance
+   * Also updates price history from candles
+   * @param {number} spot - Current spot price (not used, kept for compatibility)
    * @returns {Promise<number|null>} RSI value
    */
   async calculateRSI(spot) {
     try {
-      // Fetch RSI from API endpoint
-      const apiPort = process.env.API_PORT || 3300;
-      const rsiResponse = await axios.get(`http://localhost:${apiPort}/api/market/rsi`);
+      // Fetch candles in bot's configured timeframe
+      const candles = await this.rsiCalculator.fetchCandles();
       
-      if (rsiResponse.data.success && rsiResponse.data.data.rsi !== undefined) {
-        const rsi = rsiResponse.data.data.rsi;
-        
+      if (!candles || candles.length === 0) {
+        this.logger.warn('[SignalEngine] No candles fetched');
+        return null;
+      }
+      
+      // Extract close prices for RSI calculation
+      const closes = candles.map(c => c.close);
+      
+      // Calculate RSI
+      const rsi = this.rsiCalculator.calculateRSI(closes);
+      
+      if (rsi !== null) {
         // Store RSI in history
         const timestamp = Date.now();
         this.rsiHistory.push({ timestamp, value: rsi });
@@ -303,12 +320,18 @@ class SignalEngine {
           this.rsiHistory.shift();
         }
         
-        return rsi;
+        // Update price history from candles (more accurate than spot snapshots)
+        this.priceHistory = candles.map(c => ({
+          timestamp: c.timestamp,
+          value: c.close
+        }));
+        
+        this.logger.debug(`[SignalEngine] RSI calculated: ${rsi.toFixed(2)} from ${candles.length} candles`);
       }
       
-      return null;
+      return rsi;
     } catch (error) {
-      // RSI not available yet, not an error
+      this.logger.warn(`[SignalEngine] RSI calculation failed: ${error.message}`);
       return null;
     }
   }

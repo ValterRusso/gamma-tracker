@@ -116,6 +116,7 @@ RSI:       32.0 → 28.0 (lower low)
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
+| `timeframe` | 1h | Candle timeframe (1m, 5m, 15m, 1h, 4h, 1d) |
 | `lookback` | 20 | Number of candles to analyze |
 | `rsiOverbought` | 70 | RSI overbought threshold |
 | `rsiOversold` | 30 | RSI oversold threshold |
@@ -180,6 +181,47 @@ Confidence = (0.15 * 0.4) + (0.25 * 0.4) + (0.05 * 0.2)
 
 ---
 
+## ⏰ **TIMEFRAME SELECTION**
+
+### **Recommended Timeframes for Options Trading:**
+
+| Timeframe | Best For | Lookback Period | Trade Duration |
+|-----------|----------|-----------------|----------------|
+| **1h** (default) | Swing trades | 20 candles = 20 hours | 1-7 days |
+| **4h** | Position trades | 20 candles = 80 hours | 1-4 weeks |
+| **1d** | Long-term | 20 candles = 20 days | 1-3 months |
+| **15m** | Day trades | 20 candles = 5 hours | Hours to 1 day |
+| **5m** | Scalping | 20 candles = 100 min | Minutes to hours |
+
+**⚠️ Important:**
+- **Shorter timeframes** (5m, 15m) = More signals but more noise
+- **Longer timeframes** (4h, 1d) = Fewer signals but higher quality
+- **1h is recommended** for options (balance between signal quality and frequency)
+- Divergences on higher timeframes are more reliable
+
+### **How Timeframe Works:**
+
+```javascript
+// Bot fetches candles from Binance in configured timeframe
+const candles = await fetchCandles(symbol, timeframe='1h', limit=50);
+
+// Price history = close prices of candles
+priceHistory = candles.map(c => c.close);
+
+// RSI calculated from candle closes
+rsi = calculateRSI(priceHistory, period=14);
+
+// Divergences detected on candle data
+divergence = detectDivergence(priceHistory, rsiHistory, lookback=20);
+```
+
+**Example:**
+- `timeframe: "1h"` + `lookback: 20` = Analyzes last 20 hours
+- `timeframe: "4h"` + `lookback: 20` = Analyzes last 80 hours (3.3 days)
+- `timeframe: "1d"` + `lookback: 20` = Analyzes last 20 days
+
+---
+
 ## 🎯 **ENTRY CONDITIONS**
 
 All conditions must be met:
@@ -219,6 +261,7 @@ Exit when **any** condition is met:
   "enabled": true,
   
   "entry_rules": {
+    "timeframe": "1h",
     "lookback": 20,
     "rsiOverbought": 70,
     "rsiOversold": 30,
@@ -253,6 +296,7 @@ Exit when **any** condition is met:
   "enabled": true,
   
   "entry_rules": {
+    "timeframe": "4h",
     "lookback": 15,
     "rsiOverbought": 65,
     "rsiOversold": 35,

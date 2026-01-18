@@ -5,6 +5,7 @@
   "enabled": true,
   
   "entry_rules": {
+    "timeframe": "1h",
     "lookback": 20,
     "rsiOverbought": 70,
     "rsiOversold": 30,
