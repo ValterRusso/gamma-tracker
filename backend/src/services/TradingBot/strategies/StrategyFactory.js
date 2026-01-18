@@ -2,6 +2,7 @@ const IronCondor = require('./volatility-selling/IronCondor');
 const IronButterfly = require('./volatility-selling/IronButterfly');
 const BullCallSpread = require('./debit-spreads/BullCallSpread');
 const BearPutSpread = require('./debit-spreads/BearPutSpread');
+const RSIDivergenceStrategy = require('./divergence/RSIDivergenceStrategy');
 const Logger = require('../../../utils/logger');
 
 /**
@@ -20,7 +21,10 @@ class StrategyFactory {
       
       // Debit Spreads (2 legs)
       'bull_call_spread': BullCallSpread,
-      'bear_put_spread': BearPutSpread
+      'bear_put_spread': BearPutSpread,
+      
+      // Divergence-Based Strategies
+      'rsi_divergence': RSIDivergenceStrategy
       
       // TODO: Add more strategies as they are implemented
       // 'credit_spreads': CreditSpreads,

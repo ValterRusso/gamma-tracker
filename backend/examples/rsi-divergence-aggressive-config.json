@@ -1,0 +1,36 @@
+{
+  "name": "RSI Divergence - BTC Aggressive",
+  "strategy": "rsi_divergence",
+  "symbol": "BTC-USDT",
+  "enabled": true,
+  
+  "entry_rules": {
+    "lookback": 15,
+    "rsiOverbought": 65,
+    "rsiOversold": 35,
+    "minConfidence": 0.6,
+    "minPeakDistance": 3,
+    "longDelta": 0.55,
+    "shortDelta": 0.35,
+    "deltaTolerance": 0.15,
+    "minDTE": 15,
+    "maxDTE": 45,
+    "minSpreadWidth": 500,
+    "maxSpreadWidth": 20000,
+    "allowHiddenDiv": true
+  },
+  
+  "exit_rules": {
+    "profitTarget": 0.6,
+    "stopLoss": 0.8,
+    "dteExit": 10
+  },
+  
+  "risk_params": {
+    "accountBalance": 100000,
+    "riskPercent": 8,
+    "maxPositions": 2
+  },
+  
+  "description": "Aggressive RSI divergence strategy for BTC. Lower confidence threshold (60%), wider delta range, and more flexible DTE. Higher risk/reward with 2 concurrent positions allowed."
+}

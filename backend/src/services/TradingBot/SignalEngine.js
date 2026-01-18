@@ -23,6 +23,11 @@ class SignalEngine {
     this.optionsService = optionsService;
     this.logger = new Logger(`SignalEngine-${botId}`);
 
+    // Price and RSI history for divergence detection
+    this.priceHistory = []; // [{timestamp, price}]
+    this.rsiHistory = [];   // [{timestamp, rsi}]
+    this.maxHistoryLength = 50; // Keep last 50 candles
+
     // Create strategy instance
     try {
       // Merge entry_rules, exit_rules, risk_params into strategyParams
@@ -112,6 +117,15 @@ class SignalEngine {
         this.logger.info(`[SignalEngine] Spot price from OptionsService: $${spotPrice}`);
       }
       
+      // Store price in history
+      const timestamp = Date.now();
+      this.priceHistory.push({ timestamp, value: spotPrice });
+      
+      // Keep only last N candles
+      if (this.priceHistory.length > this.maxHistoryLength) {
+        this.priceHistory.shift();
+      }
+      
       return {
         spot: spotPrice,
         options: optionsData.options || optionsData,
@@ -159,6 +173,8 @@ class SignalEngine {
         totalOI,
         atmOptions,
         rsi,
+        priceHistory: [...this.priceHistory], // Copy for strategy
+        rsiHistory: [...this.rsiHistory],     // Copy for strategy
         timestamp: marketData.timestamp
       };
     } catch (error) {
@@ -271,11 +287,28 @@ class SignalEngine {
    */
   async calculateRSI(spot) {
     try {
-      // TODO: Implement RSI calculation using historical price data
-      // For now, return null
+      // Fetch RSI from API endpoint
+      const apiPort = process.env.API_PORT || 3300;
+      const rsiResponse = await axios.get(`http://localhost:${apiPort}/api/market/rsi`);
+      
+      if (rsiResponse.data.success && rsiResponse.data.data.rsi !== undefined) {
+        const rsi = rsiResponse.data.data.rsi;
+        
+        // Store RSI in history
+        const timestamp = Date.now();
+        this.rsiHistory.push({ timestamp, value: rsi });
+        
+        // Keep only last N candles
+        if (this.rsiHistory.length > this.maxHistoryLength) {
+          this.rsiHistory.shift();
+        }
+        
+        return rsi;
+      }
+      
       return null;
     } catch (error) {
-      this.logger.error('[SignalEngine] Error calculating RSI:', error);
+      // RSI not available yet, not an error
       return null;
     }
   }

@@ -1,0 +1,36 @@
+{
+  "name": "RSI Divergence - BTC Conservative",
+  "strategy": "rsi_divergence",
+  "symbol": "BTC-USDT",
+  "enabled": true,
+  
+  "entry_rules": {
+    "lookback": 20,
+    "rsiOverbought": 70,
+    "rsiOversold": 30,
+    "minConfidence": 0.7,
+    "minPeakDistance": 5,
+    "longDelta": 0.60,
+    "shortDelta": 0.40,
+    "deltaTolerance": 0.10,
+    "minDTE": 20,
+    "maxDTE": 60,
+    "minSpreadWidth": 1000,
+    "maxSpreadWidth": 15000,
+    "allowHiddenDiv": true
+  },
+  
+  "exit_rules": {
+    "profitTarget": 0.5,
+    "stopLoss": 0.75,
+    "dteExit": 14
+  },
+  
+  "risk_params": {
+    "accountBalance": 100000,
+    "riskPercent": 5,
+    "maxPositions": 1
+  },
+  
+  "description": "Conservative RSI divergence strategy for BTC. Enters on high-confidence divergences (>70%) with 20-60 DTE spreads. Exits at 50% profit or 75% loss."
+}
