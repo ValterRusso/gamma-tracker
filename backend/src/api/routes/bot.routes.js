@@ -482,7 +482,18 @@ module.exports = (dependencies) => {
    */
   router.post('/bot/configs', async (req, res) => {
     try {
-      const { name, strategy, symbol, entryRules, exitRules, riskParams } = req.body;
+      // Support both snake_case and camelCase field names
+      const { 
+        name, 
+        strategy, 
+        symbol,
+        entryRules,    // camelCase (legacy)
+        exitRules,     // camelCase (legacy)
+        riskParams,    // camelCase (legacy)
+        entry_rules,   // snake_case (preferred)
+        exit_rules,    // snake_case (preferred)
+        risk_params    // snake_case (preferred)
+      } = req.body;
       
       if (!name || !strategy || !symbol) {
         return res.status(400).json({
@@ -491,6 +502,11 @@ module.exports = (dependencies) => {
         });
       }
       
+      // Prefer snake_case, fallback to camelCase, default to empty object
+      const finalEntryRules = entry_rules || entryRules || {};
+      const finalExitRules = exit_rules || exitRules || {};
+      const finalRiskParams = risk_params || riskParams || {};
+      
       const BotConfig = database.getModel('BotConfig');
       
       const config = await BotConfig.create({
@@ -498,9 +514,9 @@ module.exports = (dependencies) => {
         strategy,
         symbol,
         enabled: req.body.enabled !== undefined ? req.body.enabled : true, // Default true, but allow override
-        entryRules: entryRules || {},
-        exitRules: exitRules || {},
-        riskParams: riskParams || {}
+        entryRules: finalEntryRules,
+        exitRules: finalExitRules,
+        riskParams: finalRiskParams
       });
       
       return res.status(201).json({
@@ -526,6 +542,20 @@ module.exports = (dependencies) => {
     try {
       const { id } = req.params;
       const updates = req.body;
+      
+      // Normalize snake_case to camelCase for database compatibility
+      if (updates.entry_rules) {
+        updates.entryRules = updates.entry_rules;
+        delete updates.entry_rules;
+      }
+      if (updates.exit_rules) {
+        updates.exitRules = updates.exit_rules;
+        delete updates.exit_rules;
+      }
+      if (updates.risk_params) {
+        updates.riskParams = updates.risk_params;
+        delete updates.risk_params;
+      }
       
       const BotConfig = database.getModel('BotConfig');
       const config = await BotConfig.findByPk(id);
