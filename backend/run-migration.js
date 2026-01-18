@@ -14,7 +14,7 @@ async function runMigration() {
   try {
     // Initialize database
     const database = new Database();
-    await database.initialize();
+    await database.connect();  // ← FIXED: use connect() not initialize()
     
     console.log('✅ Database connected');
     
@@ -36,7 +36,7 @@ async function runMigration() {
     console.log('🚀 You can now restart the backend and bots will auto-restart correctly!');
     
     // Close connection
-    await database.close();
+    await sequelize.close();
     process.exit(0);
     
   } catch (error) {
