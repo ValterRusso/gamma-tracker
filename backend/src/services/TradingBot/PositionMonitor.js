@@ -331,6 +331,8 @@ class PositionMonitor {
       const BotSignal = this.db.getModel('BotSignal');
       
       await BotSignal.create({
+        botId: this.botId,
+        configId: this.config.id,
         timestamp: new Date(),
         signalType: 'exit',
         strategy: trade.strategy,
