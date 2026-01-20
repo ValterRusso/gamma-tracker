@@ -34,6 +34,7 @@ class SignalEngine {
     this.waitStats = {
       count: 0,
       lastSummaryTime: Date.now(),
+      summaryInterval: 3600000 // 1 hour in milliseconds
     };
 
     this.logger.info(`[SignalEngine] Wait signal optimization enabled (summaries every 1h)`);
@@ -608,10 +609,15 @@ class SignalEngine {
   async saveSignal(signal, marketData) {
     try {
       const BotSignal = this.db.getModel('BotSignal');
+      
+      // DEBUG: Log every signal received
+      this.logger.debug(`[SignalEngine] saveSignal called: type=${signal.signalType}, strategy=${signal.strategy}`);
+      
       // ========================================
       // OPTIMIZATION: Don't save individual "wait" signals
       // ========================================
       if (signal.signalType === 'wait') {
+        this.logger.debug(`[SignalEngine] Processing wait signal (count: ${this.waitStats.count + 1})`);
         this.waitStats.count++;
 
         // Log summary every hour
@@ -624,6 +630,8 @@ class SignalEngine {
           this.logger.info(
             `[${this.config.name}] Wait summary: ${this.waitStats.count} checks with no entry conditions over ${hours}h`
           );
+          
+          this.logger.debug(`[SignalEngine] Attempting to save wait summary to DB...`);
 
         // Save hourly summary to DB
           await BotSignal.create({
@@ -647,7 +655,7 @@ class SignalEngine {
           this.waitStats.count = 0;
           this.waitStats.lastSummaryTime = now;
 
-          this.logger.info(`[SignalEngine] Wait summary saved to DB`);
+          this.logger.info(`[SignalEngine] ✅ Wait summary saved to DB successfully`);
           } else {
             // Just log debug message, don't save to DB
             this.logger.debug(
