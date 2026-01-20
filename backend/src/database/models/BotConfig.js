@@ -29,6 +29,12 @@ module.exports = (sequelize) => {
       allowNull: false,
       comment: 'Whether this config is active'
     },
+    assumeInfiniteLiquidity: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: 'assume_infinite_liquidity',
+      comment: 'Testing mode: ignore liquidity constraints to test pure strategy logic'
+    },
     entryRules: {
       type: DataTypes.JSON,
       allowNull: false,
