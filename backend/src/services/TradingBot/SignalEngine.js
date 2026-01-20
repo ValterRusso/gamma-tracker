@@ -30,6 +30,14 @@ class SignalEngine {
     this.rsiHistory = [];   // [{timestamp, value}]
     this.maxHistoryLength = 50; // Keep last 50 candles
 
+    // Wait signal statistics (to avoid DB spam)
+    this.waitStats = {
+      count: 0,
+      lastSummaryTime: Date.now(),
+    };
+
+    this.logger.info(`[SignalEngine] Wait signal optimization enabled (summaries every 1h)`);
+
     // Create dedicated RSI calculator for this bot
     const timeframe = (this.config.entry_rules?.timeframe || '1h');
     
@@ -489,7 +497,59 @@ class SignalEngine {
   async saveSignal(signal, marketData) {
     try {
       const BotSignal = this.db.getModel('BotSignal');
-      
+      // ========================================
+      // OPTIMIZATION: Don't save individual "wait" signals
+      // ========================================
+      if (signal.signalType === 'wait') {
+        this.waitStats.count++;
+
+        // Log summary every hour
+        const now = Date.now();
+        const elapsed = now - this.waitStats.lastSummaryTime;
+
+        if (elapsed >= this.waitStats.summaryInterval) {
+          const hours = (elapsed / (1000 * 60 * 60)).toFixed(2);
+
+          this.logger.info(
+            `[${this.config.name}] Wait summary: ${this.waitStats.count} checks with no entry conditions over ${hours}h`
+          );
+
+        // Save hourly summary to DB
+          await BotSignal.create({
+            botId: this.botId,
+            configId: this.config.id,
+            timestamp: new Date(),
+            signalType: 'wait_summary',
+            strategy: this.config.strategy,
+            confidence: 0,
+            marketData: {
+              spotPrice: marketData?.spotPrice || null,
+              checksPerformed: this.waitStats.count,
+              periodHours: parseFloat(hours)
+            },
+            position: null,
+            legs: null,
+            actionTaken: false,
+            reason: `No entry conditions met in ${this.waitStats.count} checks over ${hours} hours`
+          });
+          // Reset stats
+          this.waitStats.count = 0;
+          this.waitStats.lastSummaryTime = now;
+
+          this.logger.info(`[SignalEngine] Wait summary saved to DB`);
+          } else {
+            // Just log debug message, don't save to DB
+            this.logger.debug(
+              `[SignalEngine] Wait signal #${this.waitStats.count} (not saved, next summary in ${((this.waitStats.summaryInterval - elapsed) / 60000).toFixed(0)}min)`
+            );
+          }
+        return null; // Skip saving individual wait signal
+          
+      } 
+        
+      // ========================================
+      // Save actionable signals (entry, exit, error)
+      // ========================================       
       await BotSignal.create({
         botId: this.botId,
         configId: this.config.id,
