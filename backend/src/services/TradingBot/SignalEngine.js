@@ -173,20 +173,20 @@ class SignalEngine {
    */
   generateSyntheticOptions(spotPrice) {
   const syntheticOptions = [];
-  const now = Date.now();
+  const currentDate = new Date();
 
   // Generate options at multiple strikes around spot
   // Strikes: 90%, 95%, 100% (ATM), 105%, 110% of spot
   const strikeMultipliers = [0.9, 0.95, 1.0, 1.05, 1.1];
 
   // Generate for multiple expiries (7, 14, 30, 60 days)
-  const expiries = [7, 14, 30, 60]; // in days
+  const expiriesDays = [7, 14, 30, 60]; // in days
 
   strikeMultipliers.forEach(multiplier => {
     const strike = Math.round(spotPrice * multiplier * 100) / 100; // Round to nearest 100
 
-    dteDays.forEach(dte => {
-      const expiryDate = new Date(now);
+    expiriesDays.forEach(dte => {
+      const expiryDate = new Date(currentDate);
       expiryDate.setDate(expiryDate.getDate() + dte);
 
       // Estimate IV based on moneyness and DTE
@@ -225,7 +225,7 @@ class SignalEngine {
         theta: theta,
         vega: vega,
         synthetic: true, // Flag to identify testing mode
-        timestamp: now.toISOString()
+        timestamp: currentDate.toISOString()
       });
 
       // Generate PUT
@@ -253,7 +253,7 @@ class SignalEngine {
         theta: theta,
         vega: vega,
         synthetic: true, // Flag to identify testing mode
-        timestamp: now.toISOString()
+        timestamp: currentDate.toISOString()
       });
     });
   });
