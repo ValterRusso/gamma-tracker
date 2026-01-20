@@ -55,11 +55,15 @@ class TradingBotService {
       this.executionEngine = new ExecutionEngine(this.botId, this.config, this.db, this.optionsService);
       this.positionMonitor = new PositionMonitor(this.botId, this.config, this.db, this.optionsService, this.executionEngine);
       
+      // Warm-up RSI calculator with historical data (non-blocking)
+      this.logger.info('[TradingBot] Starting RSI warm-up in background...');
+      this.signalEngine.warmupPromise = this.signalEngine.warmupRSICalculator();
+      
       // Set running state
       this.isRunning = true;
       this.startTime = new Date();
       
-      // Run initial iteration
+      // Run initial iteration (will wait for warmup if needed)
       await this.runIteration();
       
       // Start periodic loop (every 60 seconds)

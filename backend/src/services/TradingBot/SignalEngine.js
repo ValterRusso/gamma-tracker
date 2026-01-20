@@ -57,6 +57,10 @@ class SignalEngine {
     
     this.logger.info(`[SignalEngine] RSI Calculator initialized for ${symbol} ${timeframe}`);
 
+    // Warm-up state
+    this.isWarmedUp = false;
+    this.warmupPromise = null;
+
     // Create strategy instance
     try {
       // Merge entry_rules, exit_rules, risk_params into strategyParams
@@ -85,6 +89,12 @@ class SignalEngine {
    */
   async analyzeMarket() {
     try {
+      // Wait for warm-up to complete (if still in progress)
+      if (!this.isWarmedUp && this.warmupPromise) {
+        this.logger.info('[SignalEngine] Waiting for warm-up to complete...');
+        await this.warmupPromise;
+      }
+
       this.logger.info(`[SignalEngine] Analyzing market for strategy: ${this.strategy.name}`);
       
       // 1. Fetch current market data
@@ -115,6 +125,94 @@ class SignalEngine {
         confidence: 0,
         reason: error.message
       };
+    }
+  }
+
+  /**
+   * Warm-up RSI calculator with historical candles
+   * This prevents "insufficient points" errors on bot startup
+   */
+  async warmupRSICalculator() {
+    try {
+      const symbol = this.config.symbol.replace('-', '');
+      const timeframe = this.config.entry_rules?.timeframe || '1h';
+      
+      this.logger.info(
+        `[SignalEngine] 🔥 Warming up: fetching ${this.maxHistoryLength} historical candles (${timeframe})...`
+      );
+      
+      // Fetch historical candles from Binance
+      const url = `https://api.binance.com/api/v3/klines`;
+      const params = {
+        symbol: symbol,
+        interval: timeframe,
+        limit: this.maxHistoryLength
+      };
+      
+      const axios = require('axios');
+      const response = await axios.get(url, { params, timeout: 10000 });
+      
+      if (!response.data || !Array.isArray(response.data)) {
+        throw new Error('Invalid response from Binance API');
+      }
+      
+      const candles = response.data.map(k => ({
+        timestamp: k[0],
+        open: parseFloat(k[1]),
+        high: parseFloat(k[2]),
+        low: parseFloat(k[3]),
+        close: parseFloat(k[4]),
+        volume: parseFloat(k[5])
+      }));
+      
+      this.logger.info(
+        `[SignalEngine] ✅ Downloaded ${candles.length} candles from Binance`
+      );
+      
+      // Populate price history
+      for (const candle of candles) {
+        this.priceHistory.push({
+          timestamp: candle.timestamp,
+          value: candle.close
+        });
+      }
+      
+      // Set candles directly in RSI calculator
+      this.rsiCalculator.candles = candles;
+      
+      // Calculate RSI with all historical closes
+      const closes = candles.map(c => c.close);
+      const currentRSI = this.rsiCalculator.calculateRSI(closes);
+      
+      if (currentRSI !== null) {
+        // Populate rsiHistory with calculated values
+        // For simplicity, we'll just add the current RSI
+        // The calculator will build full history on subsequent updates
+        this.rsiHistory.push({
+          timestamp: candles[candles.length - 1].timestamp,
+          value: currentRSI
+        });
+        
+        // Also update calculator's rsiHistory
+        this.rsiCalculator.rsiHistory.push({
+          timestamp: candles[candles.length - 1].timestamp,
+          rsi: currentRSI
+        });
+      }
+      
+      this.isWarmedUp = true;
+      
+      this.logger.info(
+        `[SignalEngine] 🎯 Warm-up complete! Price points: ${this.priceHistory.length}, RSI points: ${this.rsiHistory.length}`
+      );
+      
+      return true;
+    } catch (error) {
+      this.logger.error('[SignalEngine] ⚠️ Warm-up failed:', error.message);
+      this.logger.warn('[SignalEngine] Bot will accumulate data gradually (may take 50 iterations)');
+      // Don't throw - bot can still work, just needs time to accumulate
+      this.isWarmedUp = false;
+      return false;
     }
   }
 
