@@ -14,6 +14,12 @@ module.exports = (sequelize) => {
       field: 'bot_id',
       comment: 'Bot instance identifier (format: strategy_timestamp_random)'
     },
+    configId: {
+      type: DataTypes.STRING(36),
+      allowNull: true,
+      field: 'config_id',
+      comment: 'Bot configuration ID (references bot_configs.id)'
+    },
     timestamp: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -66,6 +72,7 @@ module.exports = (sequelize) => {
     updatedAt: false,
     indexes: [
       { fields: ['bot_id'] },
+      { fields: ['config_id'] },
       { fields: ['timestamp'] },
       { fields: ['signal_type'] },
       { fields: ['strategy'] },
