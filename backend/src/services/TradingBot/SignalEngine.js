@@ -136,8 +136,21 @@ class SignalEngine {
         this.logger.warn(`[SignalEngine] API endpoint failed, trying OptionsService fallback: ${apiError.message}`);
         // spotPrice = await this.optionsService.getCurrentSpot();
         this.logger.info(`[SignalEngine] Spot price from OptionsService: $${spotPrice}`);
-      }
+      }     
       
+      // TESTING MODE: Add synthetic options if assumeInfiniteLiquidity is enabled
+      if (this.config.assumeInfiniteLiquidity) {
+        this.logger.info(`[SignalEngine] TESTING MODE: Generating synthetic options with infinite liquidity`);
+        const syntheticOptions = this.generateSyntheticOptions(spotPrice);
+
+        // Merge real and synthetic options
+        const realOptions = optionsData.options || optionsData || [];
+        const allOptions = [...realOptions, ...syntheticOptions];
+
+        optionsData.options = allOptions;
+        this.logger.info(`[SignalEngine] Added ${syntheticOptions.length} synthetic options (total: ${allOptions.length})`);
+
+      } 
       // Note: Price history is now updated in calculateRSI() from candles
       // This ensures price history matches RSI timeframe
       
@@ -151,6 +164,104 @@ class SignalEngine {
       throw error;
     }
   }
+
+  /**
+   * Generate synthetic options for testing mode
+   * Creates theoretical options at multiple strikes with calculated Greeks
+   * @param {number} spotPrice - Current spot price
+   * @returns {Array} Array of synthetic option objects
+   */
+  generateSyntheticOptions(spotPrice) {
+  const syntheticOptions = [];
+  const now = Date.now();
+
+  // Generate options at multiple strikes around spot
+  // Strikes: 90%, 95%, 100% (ATM), 105%, 110% of spot
+  const strikeMultipliers = [0.9, 0.95, 1.0, 1.05, 1.1];
+
+  // Generate for multiple expiries (7, 14, 30, 60 days)
+  const expiries = [7, 14, 30, 60]; // in days
+
+  strikeMultipliers.forEach(multiplier => {
+    const strike = Math.round(spotPrice * multiplier * 100) / 100; // Round to nearest 100
+
+    dteDays.forEach(dte => {
+      const expiryDate = new Date(now);
+      expiryDate.setDate(expiryDate.getDate() + dte);
+
+      // Estimate IV based on moneyness and DTE
+      const moneyness = strike / spotPrice;
+      const baseIV = 0.6; // 60% base IV
+      const ivAdjustment = Math.abs(moneyness - 1) * 0.2; // Higher IV for OTM
+      const iv = baseIV + ivAdjustment;
+
+      // Generate CALL
+      const isCallITM = strike < spotPrice;
+      const callIntrinsic = isCallITM ? spotPrice - strike : 0;
+      const callExtrinsic = spotPrice * 0.02 * iv * Math.sqrt(dte / 365);
+      const callPremium = callIntrinsic + callExtrinsic;
+
+      // Simple Greeks approximations
+      const callDelta = isCallITM ? 0.5 + (moneyness - 1) * 0.5 : 0.5 - (1 - moneyness) * 0.5;
+      const gamma = 0.01 * (1 - Math.abs(moneyness - 1));
+      const theta = -callPremium / dte;
+      const vega = spotPrice * 0.01 * Math.sqrt(dte / 365);
+
+      syntheticOptions.push({
+        symbol: `BTC-${expiryDate.toISOString().split('T')[0]}-${strike}-C`,
+        strike: strike,
+        type: 'call',
+        expiryDate: expiryDate.toISOString(),
+        dte: dte,
+        markPrice: callPremium,
+        bidPrice: callPremium * 0.98,
+        askPrice: callPremium * 1.02,
+        lastPrice: callPremium,
+        volume: 999999, // Infinite liquidity
+        openInterest: 999999,
+        impliedVolatility: iv,
+        delta: callDelta,
+        gamma: gamma,
+        theta: theta,
+        vega: vega,
+        synthetic: true, // Flag to identify testing mode
+        timestamp: now.toISOString()
+      });
+
+      // Generate PUT
+      const isPutITM = strike > spotPrice;
+      const putIntrinsic = isPutITM ? strike - spotPrice : 0;
+      const putExtrinsic = spotPrice * 0.02 * iv * Math.sqrt(dte / 365);
+      const putPremium = putIntrinsic + putExtrinsic;
+      const putDelta = isPutITM ? -0.5 - (1 - moneyness) * 0.5 : -0.5 + (moneyness - 1) * 0.5;
+
+      syntheticOptions.push({
+        symbol: `BTC-${expiryDate.toISOString().split('T')[0]}-${strike}-P`,
+        strike: strike,
+        type: 'put',
+        expiryDate: expiryDate.toISOString(),
+        dte: dte,
+        markPrice: putPremium,
+        bidPrice: putPremium * 0.98,
+        askPrice: putPremium * 1.02,
+        lastPrice: putPremium,
+        volume: 999999, // Infinite liquidity
+        openInterest: 999999,
+        impliedVolatility: iv,
+        delta: putDelta,
+        gamma: gamma,
+        theta: theta,
+        vega: vega,
+        synthetic: true, // Flag to identify testing mode
+        timestamp: now.toISOString()
+      });
+    });
+  });
+  
+  return syntheticOptions;
+}
+  
+
 
   /**
    * Calculate market indicators
