@@ -39,7 +39,9 @@ class SignalEngine {
     this.logger.info(`[SignalEngine] Wait signal optimization enabled (summaries every 1h)`);
 
     // Create dedicated RSI calculator for this bot
-    const timeframe = (this.config.entry_rules?.timeframe || '1h');
+    // Support both camelCase (entryRules) and snake_case (entry_rules)
+    const entryRules = this.config.entryRules || this.config.entry_rules || {};
+    const timeframe = entryRules.timeframe || '1h';
     
     // Safety check for symbol (should exist after migration)
     if (!this.config.symbol) {
@@ -135,7 +137,8 @@ class SignalEngine {
   async warmupRSICalculator() {
     try {
       const symbol = this.config.symbol.replace('-', '');
-      const timeframe = this.config.entry_rules?.timeframe || '1h';
+      const entryRules = this.config.entryRules || this.config.entry_rules || {};
+      const timeframe = entryRules.timeframe || '1h';
       
       this.logger.info(
         `[SignalEngine] 🔥 Warming up: fetching ${this.maxHistoryLength} historical candles (${timeframe})...`
@@ -180,24 +183,34 @@ class SignalEngine {
       // Set candles directly in RSI calculator
       this.rsiCalculator.candles = candles;
       
-      // Calculate RSI with all historical closes
+      // Calculate RSI for each candle (rolling window)
+      // This populates the full RSI history
+      const period = 14;
       const closes = candles.map(c => c.close);
-      const currentRSI = this.rsiCalculator.calculateRSI(closes);
       
-      if (currentRSI !== null) {
-        // Populate rsiHistory with calculated values
-        // For simplicity, we'll just add the current RSI
-        // The calculator will build full history on subsequent updates
-        this.rsiHistory.push({
-          timestamp: candles[candles.length - 1].timestamp,
-          value: currentRSI
-        });
-        
-        // Also update calculator's rsiHistory
-        this.rsiCalculator.rsiHistory.push({
-          timestamp: candles[candles.length - 1].timestamp,
-          rsi: currentRSI
-        });
+      // Need at least period+1 candles to calculate RSI
+      if (closes.length >= period + 1) {
+        // Calculate RSI for each point starting from period+1
+        for (let i = period; i < closes.length; i++) {
+          const window = closes.slice(0, i + 1);
+          const rsi = this.rsiCalculator.calculateRSI(window, period);
+          
+          if (rsi !== null) {
+            const timestamp = candles[i].timestamp;
+            
+            // Add to SignalEngine's rsiHistory
+            this.rsiHistory.push({
+              timestamp: timestamp,
+              value: rsi
+            });
+            
+            // Add to RSICalculator's rsiHistory
+            this.rsiCalculator.rsiHistory.push({
+              timestamp: timestamp,
+              rsi: rsi
+            });
+          }
+        }
       }
       
       this.isWarmedUp = true;
