@@ -2,6 +2,7 @@ const Logger = require('../../utils/logger');
 const StrategyFactory = require('./strategies/StrategyFactory');
 const RSICalculatorV2 = require('../../calculators/RSICalculatorV2');
 const axios = require('axios');
+const { config } = require('dotenv');
 
 /**
  * Signal Generation Engine (Refactored)
@@ -380,6 +381,7 @@ class SignalEngine {
       
       await BotSignal.create({
         botId: this.botId,
+        configId: this.config.id,
         timestamp: new Date(),
         signalType: signal.signalType,
         strategy: signal.strategy,
