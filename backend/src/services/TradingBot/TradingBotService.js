@@ -187,6 +187,39 @@ class TradingBotService {
       if (signal.signalType === 'entry' && signal.strategy) {
         this.logger.info(`[TradingBot] Executing entry for ${signal.strategy}...`);
         
+        // Convert recommendedPosition format to ExecutionEngine format if needed
+        if (!signal.legs && signal.recommendedPosition?.legs) {
+          this.logger.info('[TradingBot] Converting recommendedPosition to execution format...');
+          signal.legs = signal.recommendedPosition.legs.map(leg => ({
+            option: {
+              symbol: leg.symbol,
+              strike: leg.strike,
+              type: leg.type,
+              markPrice: leg.premium,
+              expiryDate: leg.expiryDate,
+              dte: leg.dte,
+              delta: leg.delta,
+              gamma: leg.gamma,
+              theta: leg.theta,
+              vega: leg.vega
+            },
+            action: leg.action,
+            quantity: leg.contracts || 1
+          }));
+        }
+        
+        // Ensure marketData exists
+        if (!signal.marketData) {
+          this.logger.warn('[TradingBot] Signal missing marketData, fetching current spot...');
+          const currentSpot = await this.optionsService.getCurrentSpot();
+          signal.marketData = {
+            spot: currentSpot,
+            timestamp: new Date()
+          };
+        }
+        
+        this.logger.info(`[TradingBot] Signal prepared: ${signal.legs?.length || 0} legs`);
+        
         const trade = await this.executionEngine.executeEntry(signal);
         
         this.logger.info(`[TradingBot] Trade entered: ${trade.id}`);
