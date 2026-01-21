@@ -24,7 +24,7 @@ class AlwaysBuyCallStrategy extends BaseStrategy {
     this.logger.info(`[${this.name}] 🚨 TEST MODE: Forcing BUY signal`);
     
     // Find first available call option near ATM
-    const calls = options.filter(opt => opt.type === 'call');
+    const calls = options.filter(opt => opt.side === 'CALL');
     
     if (calls.length === 0) {
       return {
