@@ -25,6 +25,56 @@ class BotManager {
   }
 
   /**
+   * Wait for DataCollector to have valid spot price
+   * Prevents bots from starting before market data is available
+   */
+  async waitForDataCollector() {
+    const maxAttempts = 10;
+    const delayMs = 2000; // 2 seconds between attempts
+    
+    this.logger.info('[BotManager] ⏳ Waiting for DataCollector to be ready...');
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const apiPort = process.env.API_PORT || 3300;
+        const axios = require('axios');
+        const response = await axios.get(`http://localhost:${apiPort}/api/binance/stats`, {
+          timeout: 5000
+        });
+        
+        if (response.data.success && 
+            'spotPrice' in response.data.data &&
+            response.data.data.spotPrice > 0) {
+          
+          this.logger.info(
+            `[BotManager] ✅ DataCollector ready! Spot: $${response.data.data.spotPrice.toFixed(2)} (attempt ${attempt}/${maxAttempts})`
+          );
+          return true; // Success!
+        }
+        
+        this.logger.info(
+          `[BotManager] Attempt ${attempt}/${maxAttempts}: spotPrice not ready yet (value: ${response.data.data?.spotPrice})`
+        );
+        
+      } catch (error) {
+        this.logger.warn(
+          `[BotManager] Attempt ${attempt}/${maxAttempts}: ${error.message}`
+        );
+      }
+      
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    
+    // If we get here, DataCollector is not ready
+    this.logger.warn(
+      '[BotManager] ⚠️ DataCollector not ready after 10 attempts (20s). Bots may fail initially.'
+    );
+    return false;
+  }
+
+  /**
    * Initialize bot manager on startup
    * Auto-restarts bots that were enabled before backend restart
    */
@@ -44,6 +94,9 @@ class BotManager {
       }
       
       this.logger.info(`[BotManager] Found ${enabledConfigs.length} enabled config(s), attempting to restart...`);
+      
+      // Wait for DataCollector to be ready before starting bots
+      await this.waitForDataCollector();
       
       // Restart each enabled bot
       let successCount = 0;
