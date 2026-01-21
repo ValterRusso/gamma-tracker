@@ -254,8 +254,13 @@ class SignalEngine {
       } catch (apiError) {
         // Fallback: try OptionsService (may fail if DataCollector not ready)
         this.logger.warn(`[SignalEngine] API endpoint failed, trying OptionsService fallback: ${apiError.message}`);
-        // spotPrice = await this.optionsService.getCurrentSpot();
-        this.logger.info(`[SignalEngine] Spot price from OptionsService: $${spotPrice}`);
+        try {
+          spotPrice = await this.optionsService.getCurrentSpot();
+          this.logger.info(`[SignalEngine] Spot price from OptionsService: $${spotPrice}`);
+        } catch (fallbackError) {
+          this.logger.error(`[SignalEngine] Both API and OptionsService failed to get spot price: ${fallbackError.message}`);
+          throw new Error('Unable to fetch spot price from any source');
+        }
       }     
       
       // TESTING MODE: Add synthetic options if assumeInfiniteLiquidity is enabled
