@@ -27,6 +27,7 @@ class AlwaysBuyCallStrategy extends BaseStrategy {
     const calls = options.filter(opt => opt.side === 'CALL');
     
     if (calls.length === 0) {
+      console.log('❌ NO CALLS AVAILABLE - RETURNING WAIT');
       return {
         signalType: 'wait',
         strategy: this.name,
