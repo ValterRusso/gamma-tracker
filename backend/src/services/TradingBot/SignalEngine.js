@@ -115,8 +115,11 @@ class SignalEngine {
         indicators,
         marketData.options
       );
+
+      // 5. Add marketData to signal
+      signal.marketData = marketData;
       
-      // 5. Save signal to database
+      // 6. Save signal to database
       await this.saveSignal(signal, marketData);
       
       return signal;
