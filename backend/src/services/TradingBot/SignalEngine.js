@@ -243,13 +243,18 @@ class SignalEngine {
       let spotPrice;
       try {
         const apiPort = process.env.API_PORT || 3300;
-        const statsResponse = await axios.get(`http://localhost:${apiPort}/api/binance/stats`);
+        const statsResponse = await axios.get(`http://localhost:${apiPort}/api/binance/stats`, { timeout: 5000 });
+
         
-        if (statsResponse.data.success && statsResponse.data.spotPrice) {
-          spotPrice = statsResponse.data.spotPrice;
+        console.log('RAW SPOT:', statsResponse.data?.data?.spotPrice);
+        console.log('TYPE:', typeof statsResponse.data?.data?.spotPrice);
+         
+        if (statsResponse.data.success && 'spotPrice' in statsResponse.data.data && statsResponse.data.data.spotPrice > 0) {
+          spotPrice = statsResponse.data.data.spotPrice;
           this.logger.info(`[SignalEngine] Spot price from API: $${spotPrice.toFixed(2)}`);
         } else {
-          throw new Error('Invalid response from /api/binance/stats');
+          // Se spotPrice é 0 ou inválido, lança erro para usar fallback
+          throw new Error(`Invalid spotPrice: ${statsResponse.data?.data?.spotPrice}`);
         }
       } catch (apiError) {
         // Fallback: try OptionsService (may fail if DataCollector not ready)
