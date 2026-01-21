@@ -186,6 +186,9 @@ class TradingBotService {
       // 4. Execute entry if signal is positive
       if (signal.signalType === 'entry' && signal.strategy) {
         this.logger.info(`[TradingBot] Executing entry for ${signal.strategy}...`);
+
+        // 🔍 DEBUG: Ver exatamente o que está no sinal
+        console.log('🔍 FULL SIGNAL:', JSON.stringify(signal, null, 2));
         
         // Convert recommendedPosition format to ExecutionEngine format if needed
         if (!signal.legs && signal.recommendedPosition?.legs) {
