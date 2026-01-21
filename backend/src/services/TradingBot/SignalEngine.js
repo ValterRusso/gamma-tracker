@@ -245,8 +245,8 @@ class SignalEngine {
         const apiPort = process.env.API_PORT || 3300;
         const statsResponse = await axios.get(`http://localhost:${apiPort}/api/binance/stats`);
         
-        if (statsResponse.data.success && statsResponse.data.data.spotPrice) {
-          spotPrice = statsResponse.data.data.spotPrice;
+        if (statsResponse.data.success && statsResponse.data.spotPrice) {
+          spotPrice = statsResponse.data.spotPrice;
           this.logger.info(`[SignalEngine] Spot price from API: $${spotPrice.toFixed(2)}`);
         } else {
           throw new Error('Invalid response from /api/binance/stats');
