@@ -22,6 +22,9 @@ class AlwaysBuyCallStrategy extends BaseStrategy {
     const { spot } = marketData;
     
     this.logger.info(`[${this.name}] 🚨 TEST MODE: Forcing BUY signal`);
+
+    // Find call options with sufficient DTE
+    const MIN_DTE = 30;  // ← ADICION
     
     // Find first available call option near ATM
     const calls = options.filter(opt => opt.side === 'CALL');
