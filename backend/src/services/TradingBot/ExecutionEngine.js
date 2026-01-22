@@ -429,8 +429,9 @@ class ExecutionEngine {
       // entryCredit is negative for debit (paid), positive for credit (received)
       // exitCost is positive for credit (received), negative for debit (paid)
       // P&L = total received - total paid = exitCost + entryCredit
-      const realizedPnl = exitCost + trade.entryCredit;
-      const pnlPercent = (realizedPnl / Math.abs(trade.maxLoss)) * 100;
+      // Convert to numbers to avoid string concatenation
+      const realizedPnl = parseFloat(exitCost) + parseFloat(trade.entryCredit);
+      const pnlPercent = (realizedPnl / Math.abs(parseFloat(trade.maxLoss))) * 100;
       
       // 5. Calculate exit Greeks
       const exitGreeks = this.calculatePositionGreeks(closedLegs);
