@@ -426,7 +426,10 @@ class ExecutionEngine {
       }
       
       // 4. Calculate realized P&L
-      const realizedPnl = trade.entryCredit - exitCost;
+      // entryCredit is negative for debit (paid), positive for credit (received)
+      // exitCost is positive for credit (received), negative for debit (paid)
+      // P&L = total received - total paid = exitCost + entryCredit
+      const realizedPnl = exitCost + trade.entryCredit;
       const pnlPercent = (realizedPnl / Math.abs(trade.maxLoss)) * 100;
       
       // 5. Calculate exit Greeks

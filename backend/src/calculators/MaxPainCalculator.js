@@ -16,7 +16,7 @@
  * - Complementar análise de GEX
  */
 
-const Logger = require('../utils/Logger');
+const Logger = require('../utils/logger');
 
 class MaxPainCalculator {
   constructor() {

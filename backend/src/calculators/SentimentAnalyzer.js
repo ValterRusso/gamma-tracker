@@ -18,7 +18,7 @@
  * - Detectar mudanças de posicionamento
  */
 
-const Logger = require('../utils/Logger');
+const Logger = require('../utils/logger');
 
 class SentimentAnalyzer {
   constructor() {
