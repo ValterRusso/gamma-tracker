@@ -188,7 +188,7 @@ class TradingBotService {
         this.logger.info(`[TradingBot] Executing entry for ${signal.strategy}...`);
 
         // 🔍 DEBUG: Ver exatamente o que está no sinal
-        console.log('🔍 FULL SIGNAL:', JSON.stringify(signal, null, 2));
+        // console.log('🔍 FULL SIGNAL:', JSON.stringify(signal, null, 2));
         
         // Convert recommendedPosition format to ExecutionEngine format if needed
         if (!signal.legs && signal.recommendedPosition?.legs) {
