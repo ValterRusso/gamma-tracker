@@ -127,9 +127,9 @@ class PositionMonitor {
     
     // Build exit rules from config
     const exitRules = {
-      profitTarget: this.config.profitTargetPct || 0.5,
-      stopLoss: this.config.stopLossPct || 2.0,
-      dteExit: this.config.dteExit || 21,
+      profitTarget: this.config.profitTargetPct || 12.0,
+      stopLoss: this.config.stopLossPct || 3.0,
+     //dteExit: this.config.dteExit || 21,
       deltaThreshold: this.config.deltaThreshold || 0.70,
       ivRankChange: this.config.ivRankChange || null
     };
